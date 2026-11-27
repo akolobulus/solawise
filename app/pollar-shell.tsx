@@ -4,6 +4,7 @@ import {
   PollarProvider,
   usePollar,
 } from "@pollar/react";
+import type { AuthState } from "@pollar/core";
 import { solanaWalletStandardAdapters } from "@pollar/solana-wallet-standard-adapter";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -15,14 +16,16 @@ import {
 function SolawiseFrame({
   onLoad,
   frameRef,
+  initialHash = "",
 }: {
   onLoad?: () => void;
   frameRef?: React.RefObject<HTMLIFrameElement | null>;
+  initialHash?: string;
 }) {
   return (
     <iframe
       ref={frameRef}
-      src="/solawise.html"
+      src={`/solawise.html${initialHash}`}
       title="SolaWise"
       onLoad={onLoad}
       style={{ width: "100%", height: "100dvh", border: 0, display: "block" }}
@@ -47,7 +50,6 @@ function PollarBridge({
     login,
     logout,
     createWallet,
-    openLoginModal,
     openSendModal,
     openReceiveModal,
     openRampModal,
@@ -97,6 +99,26 @@ function PollarBridge({
     verified,
     walletBalance.step,
   ]);
+
+  useEffect(() => {
+    if (!frameLoaded) return;
+    const client = getClient();
+    const publishAuthState = (state: AuthState) => {
+      frameRef.current?.contentWindow?.postMessage(
+        {
+          type: "solawise:pollar-auth-state",
+          step: state.step,
+          email: "email" in state ? state.email : null,
+          message: state.step === "error" ? state.message : null,
+          previousStep: state.step === "error" ? state.previousStep : null,
+        },
+        window.location.origin,
+      );
+    };
+
+    publishAuthState(client.getAuthState());
+    return client.onAuthStateChange(publishAuthState);
+  }, [frameLoaded, frameRef, getClient]);
 
   useEffect(() => {
     if (!frameLoaded) return;
@@ -157,6 +179,13 @@ function PollarBridge({
       }
 
       const message = event.data as Record<string, unknown>;
+      const requireLogin = () => {
+        frameRef.current?.contentWindow?.postMessage(
+          { type: "solawise:pollar-require-login" },
+          window.location.origin,
+        );
+      };
+
       if (message.type === "solawise:program-request") {
         const requestId = message.requestId;
         if (typeof requestId !== "string") return;
@@ -168,10 +197,10 @@ function PollarBridge({
         };
 
         if (!isAuthenticated || !verified) {
-          openLoginModal();
+          requireLogin();
           respond({
             type: "solawise:program-error",
-            message: "Sign in with Pollar before using SolaWise accounts.",
+            message: "Sign in before using SolaWise accounts.",
           });
           return;
         }
@@ -239,14 +268,27 @@ function PollarBridge({
           );
         return;
       }
-
+      if (message.type === "solawise:pollar-verify-email-code") {
+        if (typeof message.code !== "string") return;
+        try {
+          getClient().verifyEmailCode(message.code);
+        } catch (error) {
+          const detail =
+            error instanceof Error ? error.message : "Could not verify the email code.";
+          frameRef.current?.contentWindow?.postMessage(
+            { type: "solawise:pollar-error", message: detail },
+            window.location.origin,
+          );
+        }
+        return;
+      }
       if (message.type === "solawise:pollar-logout") {
         logout();
         return;
       }
       if (message.type === "solawise:pollar-action") {
         if (!isAuthenticated || !verified) {
-          openLoginModal();
+          requireLogin();
           return;
         }
 
@@ -309,15 +351,39 @@ function PollarBridge({
       if (message.type !== "solawise:pollar-login") return;
 
       try {
-        if (message.provider === "google" || message.provider === "github") {
-          login({ provider: message.provider });
-        } else if (
+        if (
           message.provider === "email" &&
           typeof message.email === "string"
         ) {
           login({ provider: "email", email: message.email });
+        } else if (message.provider === "wallet") {
+          const wallets = getClient()
+            .listWalletAdapters()
+            .filter((wallet) => wallet.chain === "SOLANA");
+          const wallet =
+            wallets.find((item) =>
+              item.meta.label.toLowerCase().includes("phantom"),
+            ) ?? wallets[0];
+          if (!wallet) {
+            frameRef.current?.contentWindow?.postMessage(
+              {
+                type: "solawise:pollar-error",
+                message:
+                  "No Solana wallet was detected. Install or unlock Phantom, then reload this page.",
+              },
+              window.location.origin,
+            );
+            return;
+          }
+          login({ provider: wallet.id });
         } else {
-          openLoginModal();
+          frameRef.current?.contentWindow?.postMessage(
+            {
+              type: "solawise:pollar-error",
+              message: "Choose email sign-in or connect a Solana wallet.",
+            },
+            window.location.origin,
+          );
         }
       } catch (error) {
         const detail =
@@ -338,7 +404,6 @@ function PollarBridge({
     isAuthenticated,
     login,
     logout,
-    openLoginModal,
     openReceiveModal,
     openRampModal,
     openSendModal,
@@ -357,11 +422,13 @@ function ConfiguredPollarShell({
   frameRef,
   frameLoaded,
   onFrameLoad,
+  initialHash,
 }: {
   apiKey: string;
   frameRef: React.RefObject<HTMLIFrameElement | null>;
   frameLoaded: boolean;
   onFrameLoad: () => void;
+  initialHash: string;
 }) {
   const client = useMemo(
     () => ({
@@ -374,7 +441,11 @@ function ConfiguredPollarShell({
   return (
     <PollarProvider client={client}>
       <PollarBridge frameRef={frameRef} frameLoaded={frameLoaded} />
-      <SolawiseFrame frameRef={frameRef} onLoad={onFrameLoad} />
+    <SolawiseFrame
+      frameRef={frameRef}
+      onLoad={onFrameLoad}
+      initialHash={initialHash}
+    />
     </PollarProvider>
   );
 }
@@ -382,10 +453,14 @@ function ConfiguredPollarShell({
 export default function PollarShell() {
   const [mounted, setMounted] = useState(false);
   const [frameLoaded, setFrameLoaded] = useState(false);
+  const [initialHash, setInitialHash] = useState("");
   const frameRef = useRef<HTMLIFrameElement>(null);
   const apiKey = process.env.NEXT_PUBLIC_POLLAR_PUBLISHABLE_KEY;
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    setInitialHash(window.location.hash);
+  }, []);
 
   if (!mounted) return <SolawiseFrame />;
   if (
@@ -398,6 +473,7 @@ export default function PollarShell() {
         <SolawiseFrame
           frameRef={frameRef}
           onLoad={() => setFrameLoaded(true)}
+          initialHash={initialHash}
         />
         <div className="pollar-config-notice" role="status">
           Set NEXT_PUBLIC_POLLAR_PUBLISHABLE_KEY to a Pollar pub_testnet_ key
@@ -412,6 +488,7 @@ export default function PollarShell() {
       apiKey={apiKey}
       frameRef={frameRef}
       frameLoaded={frameLoaded}
+      initialHash={initialHash}
       onFrameLoad={() => setFrameLoaded(true)}
     />
   );
