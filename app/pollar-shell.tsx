@@ -5,28 +5,63 @@ import {
   usePollar,
 } from "@pollar/react";
 import type { AuthState } from "@pollar/core";
-import { solanaWalletStandardAdapters } from "@pollar/solana-wallet-standard-adapter";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import {
   getProgramSnapshot,
   parseProgramAction,
   runProgramAction,
 } from "./anchor-program";
+import type { SolanaTransactionSigner } from "./anchor-program";
+
+type PhantomProvider = {
+  isPhantom?: boolean;
+  publicKey: PublicKey | null;
+  connect(options?: { onlyIfTrusted?: boolean }): Promise<{ publicKey: PublicKey }>;
+  disconnect(): Promise<void>;
+  signTransaction<T extends Transaction | VersionedTransaction>(transaction: T): Promise<T>;
+  signAllTransactions<T extends Transaction | VersionedTransaction>(transactions: T[]): Promise<T[]>;
+  on(event: "accountChanged", callback: (publicKey: PublicKey | null) => void): void;
+  on(event: "disconnect", callback: () => void): void;
+  off?(event: "accountChanged", callback: (publicKey: PublicKey | null) => void): void;
+  off?(event: "disconnect", callback: () => void): void;
+};
+
+declare global {
+  interface Window {
+    phantom?: { solana?: PhantomProvider };
+  }
+}
 
 type PollarClientConfig = {
   apiKey: string;
-  walletAdapters: ReturnType<typeof solanaWalletStandardAdapters>;
 };
+
+function makePhantomSigner(
+  provider: PhantomProvider,
+  publicKey: PublicKey,
+): SolanaTransactionSigner {
+  return {
+    publicKey,
+    async signTransaction<T extends Transaction | VersionedTransaction>(
+      transaction: T,
+    ): Promise<T> {
+      return provider.signTransaction(transaction);
+    },
+    async signAllTransactions<T extends Transaction | VersionedTransaction>(
+      transactions: T[],
+    ): Promise<T[]> {
+      return provider.signAllTransactions(transactions);
+    },
+  };
+}
 
 const clientConfigs = new Map<string, PollarClientConfig>();
 
 function getClientConfig(apiKey: string): PollarClientConfig {
   let config = clientConfigs.get(apiKey);
   if (!config) {
-    config = {
-      apiKey,
-      walletAdapters: solanaWalletStandardAdapters(),
-    };
+    config = { apiKey };
     clientConfigs.set(apiKey, config);
   }
   return config;
@@ -79,6 +114,8 @@ function PollarBridge({
     refreshWalletBalance,
   } = usePollar();
   const solanaWallet = wallets.find((wallet) => wallet.chain === "SOLANA");
+  const [phantomAddress, setPhantomAddress] = useState<string | null>(null);
+  const phantomProvider = useRef<PhantomProvider | null>(null);
   const walletCreationStarted = useRef(false);
   const balances = useMemo(
     () =>
@@ -94,6 +131,26 @@ function PollarBridge({
   );
 
   useEffect(() => {
+    const provider = window.phantom?.solana;
+    if (!provider?.isPhantom) return;
+    phantomProvider.current = provider;
+    setPhantomAddress(provider.publicKey?.toBase58() ?? null);
+
+    const onAccountChanged = (publicKey: PublicKey | null) => {
+      setPhantomAddress(publicKey?.toBase58() ?? null);
+    };
+    const onDisconnect = () => setPhantomAddress(null);
+    provider.on("accountChanged", onAccountChanged);
+    provider.on("disconnect", onDisconnect);
+
+    return () => {
+      provider.off?.("accountChanged", onAccountChanged);
+      provider.off?.("disconnect", onDisconnect);
+      phantomProvider.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
     const frame = frameRef.current?.contentWindow;
     if (!frame || !frameLoaded) return;
 
@@ -105,6 +162,7 @@ function PollarBridge({
         hasWallet,
         walletAddress: solanaWallet?.address ?? null,
         walletCustody: solanaWallet?.custody ?? null,
+        externalWalletAddress: phantomAddress,
         balanceState: walletBalance.step,
         balances,
       },
@@ -116,6 +174,7 @@ function PollarBridge({
     frameRef,
     hasWallet,
     isAuthenticated,
+    phantomAddress,
     solanaWallet?.address,
     solanaWallet?.custody,
     verified,
@@ -205,8 +264,8 @@ function PollarBridge({
     let active = true;
     void getProgramSnapshot(
       isAuthenticated && verified ? getClient() : null,
-      solanaWallet?.address ?? null,
-      solanaWallet?.custody ?? null,
+      phantomAddress,
+      phantomAddress ? "external" : null,
     ).then((snapshot) => {
       if (!active) return;
       frameRef.current?.contentWindow?.postMessage(
@@ -223,8 +282,7 @@ function PollarBridge({
     frameRef,
     getClient,
     isAuthenticated,
-    solanaWallet?.address,
-    solanaWallet?.custody,
+    phantomAddress,
     verified,
   ]);
 
@@ -266,6 +324,51 @@ function PollarBridge({
         );
       };
 
+      if (message.type === "solawise:phantom-connect") {
+        const provider = window.phantom?.solana;
+        if (!provider?.isPhantom) {
+          frameRef.current?.contentWindow?.postMessage(
+            {
+              type: "solawise:wallet-error",
+              message: "Install and unlock Phantom, then reload this page.",
+            },
+            window.location.origin,
+          );
+          return;
+        }
+        phantomProvider.current = provider;
+        void provider
+          .connect()
+          .then(({ publicKey }) => setPhantomAddress(publicKey.toBase58()))
+          .catch((error: unknown) => {
+            frameRef.current?.contentWindow?.postMessage(
+              {
+                type: "solawise:wallet-error",
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Phantom could not connect.",
+              },
+              window.location.origin,
+            );
+          });
+        return;
+      }
+      if (message.type === "solawise:phantom-disconnect") {
+        void phantomProvider.current?.disconnect().catch((error: unknown) => {
+          frameRef.current?.contentWindow?.postMessage(
+            {
+              type: "solawise:wallet-error",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Phantom could not disconnect.",
+            },
+            window.location.origin,
+          );
+        });
+        return;
+      }
       if (message.type === "solawise:program-request") {
         const requestId = message.requestId;
         if (typeof requestId !== "string") return;
@@ -288,8 +391,8 @@ function PollarBridge({
         if (message.action === "refresh") {
           void getProgramSnapshot(
             getClient(),
-            solanaWallet?.address ?? null,
-            solanaWallet?.custody ?? null,
+            phantomAddress,
+            phantomAddress ? "external" : null,
           )
             .then((snapshot) =>
               respond({ type: "solawise:program-state", snapshot }),
@@ -314,26 +417,33 @@ function PollarBridge({
           });
           return;
         }
-        if (!solanaWallet?.address) {
+        const provider = phantomProvider.current;
+        const publicKey = provider?.publicKey;
+        if (
+          !phantomAddress ||
+          !provider ||
+          !publicKey ||
+          publicKey.toBase58() !== phantomAddress
+        ) {
           respond({
             type: "solawise:program-error",
-            message: "Connect a Solana wallet through Pollar first.",
+            message: "Connect Phantom to sign this Solana devnet transaction.",
           });
           return;
         }
 
         void runProgramAction(
           getClient(),
-          solanaWallet.address,
-          solanaWallet.custody,
+          phantomAddress,
           request,
+          makePhantomSigner(provider, publicKey),
         )
           .then(async (signature) => {
             respond({ type: "solawise:program-result", signature });
             const snapshot = await getProgramSnapshot(
               getClient(),
-              solanaWallet.address,
-              solanaWallet.custody,
+              phantomAddress,
+              "external",
             );
             respond({ type: "solawise:program-state", snapshot });
           })
@@ -436,31 +546,11 @@ function PollarBridge({
           typeof message.email === "string"
         ) {
           login({ provider: "email", email: message.email });
-        } else if (message.provider === "wallet") {
-          const wallets = getClient()
-            .listWalletAdapters()
-            .filter((wallet) => wallet.chain === "SOLANA");
-          const wallet =
-            wallets.find((item) =>
-              item.meta.label.toLowerCase().includes("phantom"),
-            ) ?? wallets[0];
-          if (!wallet) {
-            frameRef.current?.contentWindow?.postMessage(
-              {
-                type: "solawise:pollar-error",
-                message:
-                  "No Solana wallet was detected. Install or unlock Phantom, then reload this page.",
-              },
-              window.location.origin,
-            );
-            return;
-          }
-          login({ provider: wallet.id });
         } else {
           frameRef.current?.contentWindow?.postMessage(
             {
               type: "solawise:pollar-error",
-              message: "Choose email sign-in or connect a Solana wallet.",
+              message: "Use Pollar email-code sign-in.",
             },
             window.location.origin,
           );
@@ -492,7 +582,7 @@ function PollarBridge({
     openTxHistoryModal,
     openWalletBalanceModal,
     refreshWalletBalance,
-    solanaWallet,
+    phantomAddress,
     verified,
   ]);
 

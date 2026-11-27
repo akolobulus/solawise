@@ -127,6 +127,16 @@ export type ProgramAction =
   | { action: "refund-ticket-sale"; sale: string }
   | { action: "settle-ticket-sale"; sale: string };
 
+export type SolanaTransactionSigner = {
+  publicKey: PublicKey;
+  signTransaction<T extends Transaction | VersionedTransaction>(
+    transaction: T,
+  ): Promise<T>;
+  signAllTransactions<T extends Transaction | VersionedTransaction>(
+    transactions: T[],
+  ): Promise<T[]>;
+};
+
 export function parseProgramAction(value: unknown): ProgramAction | null {
   if (!value || typeof value !== "object") return null;
   const request = value as Record<string, unknown>;
@@ -338,7 +348,12 @@ export async function getProgramSnapshot(
   };
 
   if (!client || !walletAddress) {
-    return { ...empty, message: "Sign in with Pollar to load your devnet accounts." };
+    return {
+      ...empty,
+      message: !client
+        ? "Sign in with Pollar to load your devnet accounts."
+        : "Connect Phantom to load your devnet accounts.",
+    };
   }
 
   let mint: PublicKey;
@@ -485,19 +500,17 @@ export async function getProgramSnapshot(
 export async function runProgramAction(
   client: PollarClient,
   walletAddress: string,
-  walletCustody: string | null,
   request: ProgramAction,
+  signer: SolanaTransactionSigner,
 ): Promise<string> {
-  if (walletCustody !== "external") {
-    throw new Error(
-      "Custom Anchor transactions need an external Solana wallet. Sign out, then use Pollar wallet login with Phantom, Solflare, or Backpack.",
-    );
-  }
   if (!process.env.NEXT_PUBLIC_POLLAR_PUBLISHABLE_KEY?.startsWith("pub_testnet_")) {
     throw new Error("SolaWise program actions are restricted to Pollar Test mode.");
   }
 
-  const owner = requirePublicKey(walletAddress, "Pollar wallet");
+  const owner = requirePublicKey(walletAddress, "Phantom wallet");
+  if (!signer.publicKey.equals(owner)) {
+    throw new Error("The connected Phantom account changed. Reconnect and try again.");
+  }
   const mint = readMintAddress();
   const program = makeProgram(client, owner);
   const mintInfo = await getMint(connection, mint, "confirmed");
@@ -892,7 +905,7 @@ export async function runProgramAction(
     }
   }
 
-  return new AnchorProvider(connection, makeProgramWallet(client, owner), {
+  return new AnchorProvider(connection, signer, {
     commitment: "confirmed",
     preflightCommitment: "confirmed",
   }).sendAndConfirm(transaction, [], { commitment: "confirmed" });

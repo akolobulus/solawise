@@ -207,11 +207,11 @@ a.av{color:#fff}
 <div id="auth" class="au hide">
 <div class="W"><a class="logo" href="#landing" style="padding-top:34px"><svg width="32" height="32" viewBox="0 0 34 34" fill="none" stroke="#0067F5" stroke-width="3.5"><circle cx="17" cy="17" r="14"/><circle cx="17" cy="17" r="7"/><circle cx="17" cy="17" r="1.5" fill="#0067F5"/></svg>SolaWise</a></div>
 <section id="v-login" class="W ag hide"><div><h1>Welcome back</h1><h2>Sign in to continue</h2><p class="mut">New to SolaWise? <a class="lk2" href="#signup">Create account</a></p></div>
-<div><div class="ac"><div class="sso"><button type="button" onclick="sso('wallet')">Connect Phantom or another Solana wallet</button></div><div class="or">or sign in with email</div>
+<div><div class="ac">
 <form onsubmit="login(event)" novalidate><div class="fl"><label for="le">Email Address</label><input id="le" type="email" autocomplete="email"></div><div class="er" id="lerr" role="alert"></div><button class="go">Send sign-in code</button></form>
 <form id="login-code" class="hide" onsubmit="verifyEmailCode(event,'loginOtp','lerr')"><div class="fl"><label for="loginOtp">Email verification code</label><input id="loginOtp" type="text" inputmode="numeric" autocomplete="one-time-code"></div><button class="go">Verify code</button></form>
 </div><div class="af"><span>Secure sign-in powered by Pollar</span><span>Privacy | Terms</span></div><p class="mut" style="font-size:12px;margin-top:10px">We’ll email you a one-time code. No password required.</p></div></section>
-<section id="v-signup" class="W ag2 hide"><div><div class="ac"><div id="s1"><h1>Start your wealth journey</h1><p class="mut" style="margin:16px 0 28px">Got an account? <a class="lk2" href="#login">Sign In</a></p><div class="sso"><button type="button" onclick="sso('wallet')">Connect Phantom or another Solana wallet</button></div><div class="or">or create an account with email</div>
+<section id="v-signup" class="W ag2 hide"><div><div class="ac"><div id="s1"><h1>Start your wealth journey</h1><p class="mut" style="margin:16px 0 28px">Got an account? <a class="lk2" href="#login">Sign In</a></p>
 <form onsubmit="sign1(event)" novalidate><div class="fl"><label for="se">Email Address</label><input id="se" type="email" autocomplete="email"></div><div class="er" id="serr" role="alert"></div><button class="go">Send sign-up code</button></form>
 <form id="signup-code" class="hide" onsubmit="verifyEmailCode(event,'signupOtp','serr')"><div class="fl"><label for="signupOtp">Email verification code</label><input id="signupOtp" type="text" inputmode="numeric" autocomplete="one-time-code"></div><button class="go">Verify code</button></form></div></div>
 <p class="mut" style="font-size:12px;margin-top:8px">Your account is secured by Pollar. No password required.</p></div>
@@ -309,7 +309,7 @@ function drawer(on,w){const d=w=='l'?$('ldr'):document.querySelector('.side');d.
 $('lhb').onclick=()=>drawer(1,'l');$('abtn').onclick=()=>drawer(1,'a');$('dx').onclick=()=>drawer(0,'a');$('ov').onclick=()=>{drawer(0,'l');drawer(0,'a')};
 addEventListener('keydown',e=>{if(e.key=='Escape'){drawer(0,'l');drawer(0,'a')}});
 
-let pollarUiState={isAuthenticated:false,verified:false,hasWallet:false,walletAddress:null,walletCustody:null,configStatus:'loading',configMessage:null};
+let pollarUiState={isAuthenticated:false,verified:false,hasWallet:false,walletAddress:null,walletCustody:null,externalWalletAddress:null,configStatus:'loading',configMessage:null};
 function pollarAction(action){
  if(!pollarUiState.isAuthenticated){location.hash='login';return}
  if(window.parent===window){toast('Pollar payments are available on the SolaWise app page.');return}
@@ -339,7 +339,14 @@ function pollarRequest(provider,email){
 }
 let pollarAuthMode='login';
 let lastAuthRoute='';
-function sso(){pollarRequest('wallet')}
+function connectPhantom(){
+ if(window.parent===window)return toast('Phantom connection is available on the SolaWise app page.');
+ window.parent.postMessage({type:'solawise:phantom-connect'},location.origin)
+}
+function disconnectPhantom(){
+ if(window.parent===window)return;
+ window.parent.postMessage({type:'solawise:phantom-disconnect'},location.origin)
+}
 function login(e){
  e.preventDefault();
  const email=$('le').value.trim();
@@ -392,11 +399,13 @@ addEventListener('message',event=>{
  if(message.type==='solawise:pollar-error'){
   const error=typeof message.message==='string'?message.message:'Pollar sign-in failed.';
   (pollarAuthMode==='signup'&&location.hash==='#signup'?$('serr'):$('lerr')).textContent=error;
+ }else if(message.type==='solawise:wallet-error'){
+  toast(typeof message.message==='string'?message.message:'Phantom connection failed.');
  }else if(message.type==='solawise:pollar-auth-state'){
   handlePollarAuthState(message);
  }else if(message.type==='solawise:pollar-require-login'){
   location.hash='login';
-  toast('Sign in with email or connect a Solana wallet to continue.');
+   toast('Sign in with your Pollar email code to continue.');
  }else if(message.type==='solawise:pollar-config'){
   pollarUiState.configStatus=message.status==='ready'?'ready':message.status==='error'?'error':'loading';
   pollarUiState.configMessage=typeof message.message==='string'?message.message:null;
@@ -411,6 +420,7 @@ addEventListener('message',event=>{
    verified:message.verified===true,
    hasWallet:message.hasWallet===true,
    walletCustody:typeof message.walletCustody==='string'?message.walletCustody:null,
+   externalWalletAddress:typeof message.externalWalletAddress==='string'?message.externalWalletAddress:null,
    balanceState:typeof message.balanceState==='string'?message.balanceState:'idle',
    balances:Array.isArray(message.balances)?message.balances:[],
    walletAddress:typeof message.walletAddress==='string'?message.walletAddress:null,
@@ -448,8 +458,8 @@ function shortKey(value){return value.length>14?value.slice(0,6)+'…'+value.sli
 function programWriteReady(){
  if(!pollarUiState.isAuthenticated){location.hash='login';return false}
  if(!pollarUiState.verified){toast('Wait for Pollar to verify your sign-in.');return false}
- if(pollarUiState.walletCustody!=='external'){
-  toast('Anchor actions need an external wallet. Sign out, then use Pollar wallet login with Phantom, Solflare or Backpack.');
+ if(!pollarUiState.externalWalletAddress){
+  toast('Connect Phantom to approve this on-chain transaction.');
   return false
  }
  const state=programUiState.snapshot;
@@ -467,10 +477,9 @@ function programRequest(action,payload={}){
 function programNotice(){
  const state=programUiState.snapshot;
  if(!pollarUiState.isAuthenticated)return 'Sign in with Pollar to load your devnet accounts.';
- if(!pollarUiState.walletAddress)return 'Create or connect a Solana wallet through Pollar.';
+ if(!pollarUiState.externalWalletAddress)return 'Connect Phantom to load and sign your devnet accounts.';
  if(!state)return 'Loading Solana devnet configuration…';
  if(state.message)return state.message;
- if(pollarUiState.walletCustody!=='external')return 'Pollar-managed wallets can use Pollar payment flows, but this SDK only signs custom Anchor instructions with external wallets. Sign out and choose Phantom, Solflare or Backpack through Pollar.';
  return 'Transactions use devnet SPL tokens and require devnet SOL for network fees.';
 }
 function goalCard(goal,index){
@@ -504,7 +513,7 @@ function newCircle(){
 }
 function circle(index){
  const item=programUiState.snapshot?.circles?.[index];if(!item)return;
- const wallet=pollarUiState.walletAddress,member=item.members.find(person=>person.address===wallet),deadline=item.roundStart+item.cycleSecs,closed=Date.now()/1000>=deadline;
+ const wallet=pollarUiState.externalWalletAddress,member=item.members.find(person=>person.address===wallet),deadline=item.roundStart+item.cycleSecs,closed=Date.now()/1000>=deadline;
  const members=item.members.map((person,i)=>`<div><span>${i+1}. ${escapePollarValue(shortKey(person.address))}</span><span class="mut">${person.defaulted?'Defaulted':person.paid?'Paid this round':person.received?'Received a payout':'Joined'} · collateral ${tokenAmount(person.collateral)}</span></div>`).join('');
  let actions='';
  if(item.status==='open'&&!member)actions=`<button class="btn" id="join">Join · stake ${tokenAmount(item.collateral)} ${tokenUnit()}</button>`;
@@ -531,7 +540,7 @@ function newEvent(){
 }
 function ticketEvent(index){
  const item=programUiState.snapshot?.events?.[index];if(!item)return;
- const wallet=pollarUiState.walletAddress,now=Math.floor(Date.now()/1000),beforeStart=now<item.eventTs;
+ const wallet=pollarUiState.externalWalletAddress,now=Math.floor(Date.now()/1000),beforeStart=now<item.eventTs;
  const organizer=item.organizer===wallet,open=item.status==='open',tickets=(programUiState.snapshot?.tickets||[]).filter(ticket=>ticket.event===item.address),listed=tickets.filter(ticket=>ticket.status==='listed');
  let actions='';
  if(open&&beforeStart&&item.soldCount<item.capacity)actions+=`<button class="btn" id="buy">Buy ticket · ${tokenAmount(item.ticketPrice)} ${tokenUnit()}</button>`;
@@ -553,13 +562,13 @@ V.home=()=>`<h3 class="s" style="margin-top:0">Your Solana devnet</h3>${pollarWa
 V.save=()=>{
  const state=programUiState.snapshot,goals=state?.goals||[],circles=state?.circles||[];
  const notice=programNotice();
- const walletControl=!pollarUiState.isAuthenticated?'<button class="chip" onclick="pollarRequest(&quot;wallet&quot;)">Connect external wallet</button>':pollarUiState.walletCustody!=='external'?'<a class="chip" href="#login">Sign out to switch to an external wallet</a>':'';
+ const walletControl=pollarUiState.externalWalletAddress?`<span class="chip">Phantom · ${escapePollarValue(shortKey(pollarUiState.externalWalletAddress))}</span><button class="chip" onclick="disconnectPhantom()">Disconnect Phantom</button>`:'<button class="chip" onclick="connectPhantom()">Connect Phantom to sign transactions</button>';
  return `<p class="mut">${escapePollarValue(notice)} ${state?.mint?`Asset mint: ${escapePollarValue(state.mint)}`:''}</p><div class="chips" style="margin:14px 0"><button class="chip" onclick="programRequest('refresh')">Refresh accounts</button>${walletControl}</div><h3 class="s">On-chain goals</h3><div class="grid">${programWriteReadyMarkup()?'<button class="gc add" onclick="newGoal()" aria-label="Create goal">+</button>':''}${goals.map(goalCard).join('')||'<p class="mut">No goal vaults found for this wallet.</p>'}</div><h3 class="s">On-chain ajo circles</h3><div class="grid">${programWriteReadyMarkup()?'<button class="gc add" onclick="newCircle()" aria-label="Create ajo circle">+</button>':''}${circles.map((item,index)=>`<button class="gc" style="background:var(--bt)" onclick="circle(${index})"><span class="ms">groups</span><b>${escapePollarValue(item.name)}</b><em>${item.joined}/${item.maxMembers} members · ${item.status}</em><em>${tokenAmount(item.contribution)} ${tokenUnit()} per cycle</em></button>`).join('')||'<p class="mut">No ajo circles found for this wallet.</p>'}</div>`;
 };
-function programWriteReadyMarkup(){const state=programUiState.snapshot;return pollarUiState.isAuthenticated&&pollarUiState.verified&&pollarUiState.walletCustody==='external'&&state?.configured===true&&state?.deployed===true}
+function programWriteReadyMarkup(){const state=programUiState.snapshot;return pollarUiState.isAuthenticated&&pollarUiState.verified&&Boolean(pollarUiState.externalWalletAddress)&&state?.configured===true&&state?.deployed===true}
 V.invest=()=>`<h3 class="s" style="margin-top:0">SolaWise Grow preview</h3><p class="mut">Explore supported investment surfaces. Live protocol deposits require a separately verified strategy and supported devnet asset.</p><div class="grid" style="margin-top:16px"><button class="gc" style="background:var(--gt)" onclick="toast('Stable Yield is a strategy preview. Live deposits are not enabled.')"><span class="ms" style="font-size:34px">savings</span><b>Stable Yield</b><em>USDC lending vault</em><em>Preview</em></button><button class="gc" style="background:var(--bt)" onclick="toast('Tokenized Treasuries is a strategy preview. Live deposits are not enabled.')"><span class="ms" style="font-size:34px">account_balance</span><b>Tokenized Treasuries</b><em>Short-term on-chain treasury exposure</em><em>Preview</em></button><button class="gc" style="background:var(--yt)" onclick="toast('Naira Basket is a provider preview. Live settlement is not enabled.')"><span class="ms" style="font-size:34px">currency_exchange</span><b>Naira Basket</b><em>Provider-routed stable asset preview</em><em>Preview</em></button></div><div class="box"><h3 class="s" style="margin-top:0">Pollar payment layer</h3><p class="mut">Use Stash or Pay to open live Pollar wallet balances and supported send/receive routes.</p><button class="btn" onclick="location.hash='stash'">Open Pollar Stash</button></div>`;
 V.events=()=>{
- const state=programUiState.snapshot,events=state?.events||[],tickets=state?.tickets||[],sales=state?.ticketSales||[],wallet=pollarUiState.walletAddress;
+ const state=programUiState.snapshot,events=state?.events||[],tickets=state?.tickets||[],sales=state?.ticketSales||[],wallet=pollarUiState.externalWalletAddress;
  const eventName=address=>events.find(item=>item.address===address)?.title||'Event';
  const eventCards=events.map((item,index)=>`<button class="gc" style="background:var(--bt)" onclick="ticketEvent(${index})"><span class="ms">confirmation_number</span><b>${escapePollarValue(item.title)}</b><em>${new Date(item.eventTs*1000).toLocaleString()}</em><em>${item.soldCount}/${item.capacity} sold · ${tokenAmount(item.ticketPrice)} ${tokenUnit()}</em><em>${item.status}</em></button>`).join('');
  const ticketRows=tickets.filter(ticket=>ticket.owner===wallet).map(ticket=>{
@@ -580,7 +589,7 @@ V.events=()=>{
 };
 V.pay=()=>`${pollarWalletPanel()}<h3 class="s">Pollar payments and local services</h3><div class="box"><p class="mut">Open routes that are enabled in Pollar. Ramps, asset support and local rails are provider-controlled.</p><div class="chips" style="margin-top:12px"><button class="btn" onclick="pollarAction('ramp')">Open Pollar ramps</button><button class="btn o" onclick="pollarAction('send')">Send crypto</button><button class="btn o" onclick="pollarAction('receive')">Receive crypto</button></div></div><h3 class="s">Bill and cash-out preview</h3><div class="grid">${[['bolt','Electricity','--yt'],['call','Airtime','--gt'],['signal_cellular_alt','Data','--bt'],['tv','Cable TV','--rt'],['language','Internet','--at']].map(([icon,label,color])=>`<button class="gc" style="background:var(${color})" onclick="toast('${label} is a provider preview. No payment is submitted.')"><span class="ms" style="font-size:34px">${icon}</span><b>${label}</b><em>Provider preview</em></button>`).join('')}</div><p class="mut" style="margin-top:16px">This surface stays available for a complete demo overview. Only Pollar modals and on-chain wallet actions submit real transactions.</p>`;
 V.stash=()=>pollarWalletPanel();
-V.profile=()=>`<div class="box"><h3 class="s" style="margin-top:0">Pollar account</h3><p class="mut">Wallet: ${pollarUiState.walletAddress?escapePollarValue(pollarUiState.walletAddress):'Not connected'}</p><p class="mut">Signing: ${escapePollarValue(pollarUiState.walletCustody||'Not available')}</p><p class="mut" style="margin-top:12px">${escapePollarValue(programNotice())}</p><a class="btn o" href="#login" style="margin-top:16px">Sign out / switch wallet</a></div>`;
+V.profile=()=>`<div class="box"><h3 class="s" style="margin-top:0">Pollar account</h3><p class="mut">Pollar wallet: ${pollarUiState.walletAddress?escapePollarValue(pollarUiState.walletAddress):'Not connected'}</p><p class="mut">Phantom signer: ${pollarUiState.externalWalletAddress?escapePollarValue(pollarUiState.externalWalletAddress):'Not connected'}</p><p class="mut" style="margin-top:12px">${escapePollarValue(programNotice())}</p><button class="btn o" onclick="disconnectPhantom()" style="margin-top:16px">Disconnect Phantom</button> <a class="btn o" href="#login" style="margin-top:16px">Sign out of Pollar</a></div>`;
 V.ai=()=>`<div class="chat"><b style="font-size:24px">SolaWise Assistant</b><p class="mut" style="margin:6px 0 16px">Guidance only; the assistant cannot move funds or replace financial advice. No wallet address or account history is sent with your messages.</p><div class="msgs" id="msgs" aria-live="polite">${S.chat.map(message=>`<div class="bb2 ${message.role==='user'?'u':'a'}">${escapePollarValue(message.content)}</div>`).join('')}${BUSY?'<div class="bb2 a">Thinking…</div>':''}${AI_ERROR?`<div class="bb2 err" role="alert">${escapePollarValue(AI_ERROR)}</div>`:''}</div><div class="cin"><input id="q" maxlength="2000" placeholder="Ask SolaWise…" onkeydown="if(event.key==='Enter')ask()" aria-label="Ask a question"><button class="chip" onclick="mic()" aria-label="Speak your question"><span class="ms">mic</span></button><button class="btn" onclick="ask()" ${BUSY?'disabled':''}>Send</button></div><p class="mut">AI responses use server-side Groq. Provider errors are shown here; no simulated answers are used.</p></div>`;
 addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==parent||!event.data||typeof event.data!=='object')return;

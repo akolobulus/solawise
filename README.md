@@ -52,11 +52,12 @@ the current seller can claim escrowed sale proceeds.
 
 ### SolaWise Pay
 
-The app provides Pollar-managed Solana wallet login and Pollar Wallet Standard
-adapters for Phantom, Solflare and Backpack. Pollar modals support send,
-receive, wallet balance, transaction history and available local ramp routes.
-Every external wallet transaction requires wallet approval. The Pollar
-integration uses testnet keys and devnet SOL/test assets.
+Pollar email-code auth powers the account and supported Pollar payment flows.
+Phantom connects separately as the signer for SolaWise's custom Anchor
+instructions, so users approve each real Solana devnet transaction in Phantom.
+Pollar modals support send, receive, wallet balance, transaction history and
+available local ramp routes. The Pollar integration uses testnet keys and
+devnet SOL/test assets.
 
 ### SolaWise Assistant
 
@@ -92,13 +93,15 @@ The app uses:
 The browser provider uses a publishable test-mode key and cached client
 configuration. Email-code login verifies Pollar auth. Pollar wallets use
 `ON_DEMAND` or `AT_LOGIN` provisioning when configured in the dashboard.
-External Phantom/Solflare/Backpack wallets are discovered through Wallet
-Standard and can sign custom Anchor instructions.
+The app does not use Pollar's wallet-login challenge: Phantom connects directly
+and signs the custom Anchor transactions from the app's parent frame.
 
 Pollar-managed custody is intentionally separated from external-wallet signing:
 Pollar payment flows can operate on a Pollar wallet, while custom goal, Ajo and
-ticket instructions require an external signer. Supported Pollar send/receive,
-balance and history modals are wired directly to the SDK.
+ticket instructions require the connected Phantom signer. Supported Pollar
+send/receive, balance and history modals are wired directly to the SDK. Pollar
+is needed for the Pollar Payments track, but is not a requirement for Solana
+devnet deployment or the overall/DeFi tracks.
 
 ## AI assistant integration
 
