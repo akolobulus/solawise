@@ -14,9 +14,7 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import BN from "bn.js";
-import type { PollarClient } from "@pollar/core";
 import idl from "../target/idl/solawise.json";
-import type { Solawise } from "../target/types/solawise";
 
 const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 const DEVNET_USDC_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
@@ -238,17 +236,6 @@ export function parseProgramAction(value: unknown): ProgramAction | null {
   }
 }
 
-function toBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
-function fromBase64(value: string): Uint8Array {
-  const binary = atob(value);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
 function amountToBaseUnits(value: string, decimals: number): BN {
   const match = /^(\d+)(?:\.(\d+))?$/.exec(value.trim());
   if (!match || decimals < 0 || decimals > 18) {
@@ -283,12 +270,15 @@ function circleStatus(status: unknown): string {
   return "unknown";
 }
 
-function makeProgram(client: PollarClient, owner: PublicKey) {
-  const provider = new AnchorProvider(connection, makeProgramWallet(client, owner), {
+function makeProgram(
+  owner: PublicKey,
+  wallet: SolanaTransactionSigner = makeReadOnlyProgramWallet(owner),
+) {
+  const provider = new AnchorProvider(connection, wallet, {
     commitment: "confirmed",
     preflightCommitment: "confirmed",
   });
-  return new Program<Solawise>(idl as Solawise, provider);
+  return new Program(idl as any, provider);
 }
 
 function readMintAddress(): PublicKey {
@@ -328,7 +318,6 @@ function requirePublicKey(value: string, label: string): PublicKey {
 }
 
 export async function getProgramSnapshot(
-  client: PollarClient | null,
   walletAddress: string | null,
   walletCustody: string | null,
 ): Promise<ProgramSnapshot> {
@@ -347,12 +336,10 @@ export async function getProgramSnapshot(
     message: null,
   };
 
-  if (!client || !walletAddress) {
+  if (!walletAddress) {
     return {
       ...empty,
-      message: !client
-        ? "Sign in with Pollar to load your devnet accounts."
-        : "Connect Phantom to load your devnet accounts.",
+      message: "Connect Phantom to load your devnet accounts.",
     };
   }
 
@@ -368,7 +355,7 @@ export async function getProgramSnapshot(
 
   try {
     const owner = requirePublicKey(walletAddress, "Pollar wallet");
-    const program = makeProgram(client, owner);
+    const program = makeProgram(owner);
     const mintInfo = await getMint(connection, mint, "confirmed");
     const deployed = await connection.getAccountInfo(program.programId, "confirmed");
     if (!deployed?.executable) {
@@ -383,13 +370,15 @@ export async function getProgramSnapshot(
       };
     }
 
-    const [goals, allCircles, allEvents, allTickets, allTicketSales] = await Promise.all([
-      program.account.goal.all(),
-      program.account.circle.all(),
-      program.account.event.all(),
-      program.account.ticket.all(),
-      program.account.ticketSale.all(),
-    ]);
+    const accounts = program.account as any;
+    const [goals, allCircles, allEvents, allTickets, allTicketSales] =
+      (await Promise.all([
+        accounts.goal.all(),
+        accounts.circle.all(),
+        accounts.event.all(),
+        accounts.ticket.all(),
+        accounts.ticketSale.all(),
+      ])) as Array<Array<{ publicKey: PublicKey; account: any }>>;
     const ownerGoals = goals
       .filter(({ account }) => account.owner.equals(owner))
       .map(({ publicKey, account }) => ({
@@ -405,7 +394,7 @@ export async function getProgramSnapshot(
           account.creator.equals(owner) ||
           account.members
             .slice(0, account.joined)
-            .some((member) => member.key.equals(owner)),
+            .some((member: any) => member.key.equals(owner)),
       )
       .map(({ publicKey, account }) => ({
         address: publicKey.toBase58(),
@@ -418,7 +407,7 @@ export async function getProgramSnapshot(
         round: account.round,
         roundStart: account.roundStart.toNumber(),
         status: circleStatus(account.status),
-        members: account.members.slice(0, account.joined).map((member) => ({
+        members: account.members.slice(0, account.joined).map((member: any) => ({
           address: member.key.toBase58(),
           collateral: member.collateral.toString(),
           paid: member.paid,
@@ -498,7 +487,6 @@ export async function getProgramSnapshot(
 }
 
 export async function runProgramAction(
-  client: PollarClient,
   walletAddress: string,
   request: ProgramAction,
   signer: SolanaTransactionSigner,
@@ -512,7 +500,8 @@ export async function runProgramAction(
     throw new Error("The connected Phantom account changed. Reconnect and try again.");
   }
   const mint = readMintAddress();
-  const program = makeProgram(client, owner);
+  const program = makeProgram(owner, signer);
+  const accounts = program.account as any;
   const mintInfo = await getMint(connection, mint, "confirmed");
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
   const transaction = (await createOwnerAtaIfMissing(owner, mint)) ?? new Transaction();
@@ -664,7 +653,7 @@ export async function runProgramAction(
     }
     case "settle-round": {
       const circle = requirePublicKey(request.circle, "Circle");
-      const circleAccount = await program.account.circle.fetch(circle);
+      const circleAccount = await accounts.circle.fetch(circle);
       const recipient = circleAccount.members[circleAccount.round]?.key;
       if (!recipient) throw new Error("The current ajo round has no recipient.");
       const [vault] = PublicKey.findProgramAddressSync(
@@ -745,7 +734,7 @@ export async function runProgramAction(
     }
     case "buy-ticket": {
       const event = requirePublicKey(request.event, "Event");
-      const eventAccount = await program.account.event.fetch(event);
+      const eventAccount = await accounts.event.fetch(event);
       const ticketId = eventAccount.soldCount;
       const saleId = eventAccount.nextSaleId;
       const [ticket] = PublicKey.findProgramAddressSync(
@@ -784,7 +773,7 @@ export async function runProgramAction(
     case "list-ticket":
     case "unlist-ticket": {
       const ticket = requirePublicKey(request.ticket, "Ticket");
-      const ticketAccount = await program.account.ticket.fetch(ticket);
+      const ticketAccount = await accounts.ticket.fetch(ticket);
       const method =
         request.action === "list-ticket"
           ? program.methods.listTicket(
@@ -804,8 +793,8 @@ export async function runProgramAction(
     }
     case "buy-resale": {
       const ticket = requirePublicKey(request.ticket, "Ticket");
-      const ticketAccount = await program.account.ticket.fetch(ticket);
-      const event = await program.account.event.fetch(ticketAccount.event);
+      const ticketAccount = await accounts.ticket.fetch(ticket);
+      const event = await accounts.event.fetch(ticketAccount.event);
       const eventAddress = ticketAccount.event;
       const saleId = event.nextSaleId;
       const [sale] = PublicKey.findProgramAddressSync(
@@ -860,7 +849,7 @@ export async function runProgramAction(
     case "refund-ticket-sale":
     case "settle-ticket-sale": {
       const sale = requirePublicKey(request.sale, "Ticket sale");
-      const saleAccount = await program.account.ticketSale.fetch(sale);
+      const saleAccount = await accounts.ticketSale.fetch(sale);
       const event = saleAccount.event;
       const [vault] = PublicKey.findProgramAddressSync(
         [Buffer.from("event_vault"), event.toBuffer()],
@@ -911,34 +900,14 @@ export async function runProgramAction(
   }).sendAndConfirm(transaction, [], { commitment: "confirmed" });
 }
 
-function makeProgramWallet(client: PollarClient, owner: PublicKey) {
+function makeReadOnlyProgramWallet(owner: PublicKey): SolanaTransactionSigner {
   return {
     publicKey: owner,
-    async signTransaction<T extends Transaction | VersionedTransaction>(
-      transaction: T,
-    ): Promise<T> {
-      const serialized =
-        transaction instanceof Transaction
-          ? transaction.serialize({
-              requireAllSignatures: false,
-              verifySignatures: false,
-            })
-          : transaction.serialize();
-      const signed = fromBase64(
-        await client.signSolanaTransaction(toBase64(serialized)),
-      );
-      return (
-        transaction instanceof Transaction
-          ? Transaction.from(signed)
-          : VersionedTransaction.deserialize(signed)
-      ) as T;
+    async signTransaction<T extends Transaction | VersionedTransaction>(): Promise<T> {
+      throw new Error("A connected Phantom wallet is required to sign transactions.");
     },
-    async signAllTransactions<T extends Transaction | VersionedTransaction>(
-      transactions: T[],
-    ): Promise<T[]> {
-      return Promise.all(
-        transactions.map((transaction) => this.signTransaction(transaction)),
-      );
+    async signAllTransactions<T extends Transaction | VersionedTransaction>(): Promise<T[]> {
+      throw new Error("A connected Phantom wallet is required to sign transactions.");
     },
   };
 }

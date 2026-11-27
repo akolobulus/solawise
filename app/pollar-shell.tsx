@@ -6,7 +6,18 @@ import {
 } from "@pollar/react";
 import type { AuthState } from "@pollar/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
+import {
+  clusterApiUrl,
+  Connection,
+  PublicKey,
+  Transaction,
+  VersionedTransaction,
+} from "@solana/web3.js";
+import {
+  getAccount,
+  getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import {
   getProgramSnapshot,
   parseProgramAction,
@@ -30,12 +41,22 @@ type PhantomProvider = {
 declare global {
   interface Window {
     phantom?: { solana?: PhantomProvider };
+    solana?: PhantomProvider;
+    solawiseConnectPhantom?: () => void;
   }
+}
+
+function getPhantomProvider(): PhantomProvider | null {
+  if (typeof window === "undefined") return null;
+  const provider = window.phantom?.solana ?? window.solana;
+  return provider?.isPhantom ? provider : null;
 }
 
 type PollarClientConfig = {
   apiKey: string;
 };
+
+type AuthRoute = "login" | "signup" | null;
 
 function makePhantomSigner(
   provider: PhantomProvider,
@@ -90,9 +111,13 @@ function SolawiseFrame({
 function PollarBridge({
   frameRef,
   frameLoaded,
+  authRoute,
+  setAuthRoute,
 }: {
   frameRef: React.RefObject<HTMLIFrameElement | null>;
   frameLoaded: boolean;
+  authRoute: AuthRoute;
+  setAuthRoute: (route: AuthRoute) => void;
 }) {
   const {
     isAuthenticated,
@@ -104,6 +129,7 @@ function PollarBridge({
     configStatus,
     appConfig,
     login,
+    openLoginModal,
     logout,
     createWallet,
     openSendModal,
@@ -115,6 +141,13 @@ function PollarBridge({
   } = usePollar();
   const solanaWallet = wallets.find((wallet) => wallet.chain === "SOLANA");
   const [phantomAddress, setPhantomAddress] = useState<string | null>(null);
+  const [phantomAvailable, setPhantomAvailable] = useState(false);
+  const [phantomBalance, setPhantomBalance] = useState<{
+    step: "idle" | "loading" | "loaded" | "error";
+    sol: string | null;
+    usdc: string | null;
+  }>({ step: "idle", sol: null, usdc: null });
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
   const phantomProvider = useRef<PhantomProvider | null>(null);
   const walletCreationStarted = useRef(false);
   const balances = useMemo(
@@ -131,10 +164,20 @@ function PollarBridge({
   );
 
   useEffect(() => {
-    const provider = window.phantom?.solana;
-    if (!provider?.isPhantom) return;
+    const provider = getPhantomProvider();
+    if (!provider) {
+      setPhantomAvailable(false);
+      return;
+    }
+    setPhantomAvailable(true);
     phantomProvider.current = provider;
     setPhantomAddress(provider.publicKey?.toBase58() ?? null);
+    void provider
+      .connect({ onlyIfTrusted: true })
+      .then(({ publicKey }) => setPhantomAddress(publicKey.toBase58()))
+      .catch(() => {
+        // An untrusted site should remain disconnected until the user clicks Connect.
+      });
 
     const onAccountChanged = (publicKey: PublicKey | null) => {
       setPhantomAddress(publicKey?.toBase58() ?? null);
@@ -151,6 +194,100 @@ function PollarBridge({
   }, []);
 
   useEffect(() => {
+    window.solawiseConnectPhantom = () => {
+      const provider = getPhantomProvider();
+      const frame = frameRef.current?.contentWindow;
+      if (!provider) {
+        setAuthMessage(
+          "Phantom was not detected. Enable its Chrome extension, then refresh this page or use Pollar sign-in.",
+        );
+        frame?.postMessage(
+          {
+            type: "solawise:wallet-error",
+            message: "Phantom was not detected. Enable its Chrome extension, then refresh this page or use Pollar sign-in.",
+          },
+          window.location.origin,
+        );
+        return;
+      }
+
+      phantomProvider.current = provider;
+      setAuthMessage("Check Phantom and approve the connection request to continue.");
+      frame?.postMessage(
+        {
+          type: "solawise:wallet-pending",
+          message: "Check Phantom and approve the connection request to continue.",
+        },
+        window.location.origin,
+      );
+      void provider
+        .connect()
+        .then(({ publicKey }) => {
+          setPhantomAddress(publicKey.toBase58());
+          setAuthMessage(null);
+        })
+        .catch((error: unknown) => {
+          const errorCode =
+            typeof error === "object" && error !== null && "code" in error
+              ? error.code
+              : null;
+          const message =
+            errorCode === 4001
+              ? "Connection declined. Click Connect Phantom and approve the request in your extension."
+              : error instanceof Error
+                ? error.message
+                : "Phantom could not connect.";
+          setAuthMessage(message);
+          frame?.postMessage(
+            { type: "solawise:wallet-error", message },
+            window.location.origin,
+          );
+        });
+    };
+
+    return () => {
+      delete window.solawiseConnectPhantom;
+    };
+  }, [frameRef]);
+
+  useEffect(() => {
+    if (!phantomAddress) {
+      setPhantomBalance({ step: "idle", sol: null, usdc: null });
+      return;
+    }
+
+    let active = true;
+    setPhantomBalance((current) => ({ ...current, step: "loading" }));
+    const owner = new PublicKey(phantomAddress);
+    const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+    const mint = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+    const ata = getAssociatedTokenAddressSync(mint, owner, true, TOKEN_PROGRAM_ID);
+
+    void Promise.all([
+      connection.getBalance(owner).catch(() => null),
+      getAccount(connection, ata, "confirmed").catch(() => null),
+    ]).then(([lamports, usdcAccount]) => {
+      if (!active) return;
+      if (lamports === null && usdcAccount === null) {
+        setPhantomBalance({ step: "error", sol: null, usdc: null });
+        return;
+      }
+      setPhantomBalance({
+        step: "loaded",
+        sol: lamports === null ? null : (lamports / 1_000_000_000).toFixed(4),
+        usdc:
+          usdcAccount === null
+            ? "0.000000"
+            : (Number(usdcAccount.amount) / 1_000_000).toFixed(6),
+      });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [phantomAddress]);
+
+  useEffect(() => {
     const frame = frameRef.current?.contentWindow;
     if (!frame || !frameLoaded) return;
 
@@ -163,6 +300,12 @@ function PollarBridge({
         walletAddress: solanaWallet?.address ?? null,
         walletCustody: solanaWallet?.custody ?? null,
         externalWalletAddress: phantomAddress,
+        phantomAvailable,
+        phantomBalance: {
+          step: phantomBalance.step,
+          sol: phantomBalance.sol,
+          usdc: phantomBalance.usdc,
+        },
         balanceState: walletBalance.step,
         balances,
       },
@@ -175,6 +318,8 @@ function PollarBridge({
     hasWallet,
     isAuthenticated,
     phantomAddress,
+    phantomAvailable,
+    phantomBalance,
     solanaWallet?.address,
     solanaWallet?.custody,
     verified,
@@ -243,6 +388,16 @@ function PollarBridge({
     if (!frameLoaded) return;
     const client = getClient();
     const publishAuthState = (state: AuthState) => {
+      if (state.step === "error") {
+        setAuthMessage(state.message);
+      } else if (state.step === "sending_email") {
+        setAuthMessage("Pollar is sending your verification code.");
+      } else if (state.step === "entering_code" || state.step === "verifying_email_code") {
+        setAuthMessage("Complete the verification step in the Pollar sign-in window.");
+      } else if (state.step === "authenticated" && state.verified) {
+        setAuthMessage(null);
+      }
+
       frameRef.current?.contentWindow?.postMessage(
         {
           type: "solawise:pollar-auth-state",
@@ -257,13 +412,12 @@ function PollarBridge({
 
     publishAuthState(client.getAuthState());
     return client.onAuthStateChange(publishAuthState);
-  }, [frameLoaded, frameRef, getClient]);
+  }, [frameLoaded, frameRef, getClient, setAuthMessage]);
 
   useEffect(() => {
     if (!frameLoaded) return;
     let active = true;
     void getProgramSnapshot(
-      isAuthenticated && verified ? getClient() : null,
       phantomAddress,
       phantomAddress ? "external" : null,
     ).then((snapshot) => {
@@ -280,11 +434,14 @@ function PollarBridge({
   }, [
     frameLoaded,
     frameRef,
-    getClient,
-    isAuthenticated,
     phantomAddress,
-    verified,
   ]);
+
+  useEffect(() => {
+    if (!phantomAddress && !(isAuthenticated && verified)) return;
+    setAuthRoute(null);
+    setAuthMessage(null);
+  }, [isAuthenticated, phantomAddress, setAuthRoute, verified]);
 
   useEffect(() => {
     if (!isAuthenticated || !verified || !hasWallet) return;
@@ -317,6 +474,17 @@ function PollarBridge({
       }
 
       const message = event.data as Record<string, unknown>;
+      if (message.type === "solawise:auth-route") {
+        const route = message.route;
+        if (route === "login" || route === "signup") {
+          setAuthRoute(route);
+          setAuthMessage(null);
+        } else if (route === null) {
+          setAuthRoute(null);
+          setAuthMessage(null);
+        }
+        return;
+      }
       const requireLogin = () => {
         frameRef.current?.contentWindow?.postMessage(
           { type: "solawise:pollar-require-login" },
@@ -324,36 +492,6 @@ function PollarBridge({
         );
       };
 
-      if (message.type === "solawise:phantom-connect") {
-        const provider = window.phantom?.solana;
-        if (!provider?.isPhantom) {
-          frameRef.current?.contentWindow?.postMessage(
-            {
-              type: "solawise:wallet-error",
-              message: "Install and unlock Phantom, then reload this page.",
-            },
-            window.location.origin,
-          );
-          return;
-        }
-        phantomProvider.current = provider;
-        void provider
-          .connect()
-          .then(({ publicKey }) => setPhantomAddress(publicKey.toBase58()))
-          .catch((error: unknown) => {
-            frameRef.current?.contentWindow?.postMessage(
-              {
-                type: "solawise:wallet-error",
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : "Phantom could not connect.",
-              },
-              window.location.origin,
-            );
-          });
-        return;
-      }
       if (message.type === "solawise:phantom-disconnect") {
         void phantomProvider.current?.disconnect().catch((error: unknown) => {
           frameRef.current?.contentWindow?.postMessage(
@@ -379,18 +517,8 @@ function PollarBridge({
           );
         };
 
-        if (!isAuthenticated || !verified) {
-          requireLogin();
-          respond({
-            type: "solawise:program-error",
-            message: "Sign in before using SolaWise accounts.",
-          });
-          return;
-        }
-
         if (message.action === "refresh") {
           void getProgramSnapshot(
-            getClient(),
             phantomAddress,
             phantomAddress ? "external" : null,
           )
@@ -433,18 +561,13 @@ function PollarBridge({
         }
 
         void runProgramAction(
-          getClient(),
           phantomAddress,
           request,
           makePhantomSigner(provider, publicKey),
         )
           .then(async (signature) => {
             respond({ type: "solawise:program-result", signature });
-            const snapshot = await getProgramSnapshot(
-              getClient(),
-              phantomAddress,
-              "external",
-            );
+            const snapshot = await getProgramSnapshot(phantomAddress, "external");
             respond({ type: "solawise:program-state", snapshot });
           })
           .catch((error: unknown) =>
@@ -583,10 +706,157 @@ function PollarBridge({
     openWalletBalanceModal,
     refreshWalletBalance,
     phantomAddress,
+    setAuthRoute,
     verified,
   ]);
 
-  return null;
+  if (!authRoute) return null;
+
+  const connectWithPhantom = () => {
+    if (typeof window.solawiseConnectPhantom !== "function") {
+      setAuthMessage("Wallet connection is still initializing. Refresh and try again.");
+      return;
+    }
+    window.solawiseConnectPhantom();
+  };
+  const connectWithPollar = () => {
+    setAuthMessage(null);
+    try {
+      openLoginModal();
+    } catch (error) {
+      setAuthMessage(
+        error instanceof Error ? error.message : "Pollar sign-in could not be opened.",
+      );
+    }
+  };
+
+  const walletConnectControl =
+    authRoute === null && isAuthenticated && verified && !phantomAddress ? (
+      <div
+        style={{
+          position: "fixed",
+          top: 16,
+          right: 16,
+          zIndex: 40,
+          display: "grid",
+          gap: 8,
+          justifyItems: "end",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <button
+          type="button"
+          onClick={connectWithPhantom}
+          style={{
+            minHeight: 44,
+            padding: "0 16px",
+            border: 0,
+            borderRadius: 8,
+            background: "#0067F5",
+            color: "#fff",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Connect Phantom for savings
+        </button>
+        {authMessage && (
+          <span
+            role="status"
+            style={{
+              maxWidth: 320,
+              padding: "8px 12px",
+              borderRadius: 8,
+              background: "#fff",
+              color: "#0A2E65",
+            }}
+          >
+            {authMessage}
+          </span>
+        )}
+      </div>
+    ) : null;
+
+  return (
+    <>
+      {walletConnectControl}
+      {authRoute && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 40,
+            display: "grid",
+            placeItems: "center",
+            padding: 24,
+            background: "rgba(10, 20, 42, .72)",
+            fontFamily: "system-ui, sans-serif",
+          }}
+        >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="solawise-auth-title"
+          style={{
+            width: "min(440px, 100%)",
+            padding: 28,
+            borderRadius: 20,
+            background: "#fff",
+            color: "#0A2E65",
+            boxShadow: "0 24px 80px rgba(0,0,0,.24)",
+          }}
+        >
+          <h1 id="solawise-auth-title" style={{ margin: "0 0 8px", fontSize: 28 }}>
+            {authRoute === "signup" ? "Create your SolaWise account" : "Welcome back"}
+          </h1>
+          <p style={{ margin: "0 0 20px", color: "#6b7a95", lineHeight: 1.5 }}>
+            Choose Phantom or Pollar. Approve the request in your wallet or complete Pollar sign-in to continue.
+          </p>
+          <button
+            type="button"
+            onClick={connectWithPhantom}
+            style={{
+              width: "100%",
+              minHeight: 48,
+              border: 0,
+              borderRadius: 8,
+              background: "#0067F5",
+              color: "#fff",
+              fontSize: 16,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Continue with Phantom
+          </button>
+          <button
+            type="button"
+            onClick={connectWithPollar}
+            style={{
+              width: "100%",
+              minHeight: 48,
+              marginTop: 10,
+              border: "1px solid #d5ddec",
+              borderRadius: 8,
+              background: "#fff",
+              color: "#0A2E65",
+              fontSize: 16,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Continue with Pollar
+          </button>
+          {authMessage && (
+            <p role="status" style={{ margin: "14px 0 0", color: "#6b7a95", lineHeight: 1.5 }}>
+              {authMessage}
+            </p>
+          )}
+        </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function ConfiguredPollarShell({
@@ -595,23 +865,32 @@ function ConfiguredPollarShell({
   frameLoaded,
   onFrameLoad,
   initialHash,
+  authRoute,
+  setAuthRoute,
 }: {
   apiKey: string;
   frameRef: React.RefObject<HTMLIFrameElement | null>;
   frameLoaded: boolean;
   onFrameLoad: () => void;
   initialHash: string;
+  authRoute: AuthRoute;
+  setAuthRoute: (route: AuthRoute) => void;
 }) {
   const client = getClientConfig(apiKey);
 
   return (
     <PollarProvider client={client}>
-      <PollarBridge frameRef={frameRef} frameLoaded={frameLoaded} />
-    <SolawiseFrame
-      frameRef={frameRef}
-      onLoad={onFrameLoad}
-      initialHash={initialHash}
-    />
+      <PollarBridge
+        frameRef={frameRef}
+        frameLoaded={frameLoaded}
+        authRoute={authRoute}
+        setAuthRoute={setAuthRoute}
+      />
+      <SolawiseFrame
+        frameRef={frameRef}
+        onLoad={onFrameLoad}
+        initialHash={initialHash}
+      />
     </PollarProvider>
   );
 }
@@ -620,12 +899,15 @@ export default function PollarShell() {
   const [mounted, setMounted] = useState(false);
   const [frameLoaded, setFrameLoaded] = useState(false);
   const [initialHash, setInitialHash] = useState("");
+  const [authRoute, setAuthRoute] = useState<AuthRoute>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const apiKey = process.env.NEXT_PUBLIC_POLLAR_PUBLISHABLE_KEY;
 
   useEffect(() => {
     setMounted(true);
     setInitialHash(window.location.hash);
+    if (window.location.hash === "#login") setAuthRoute("login");
+    else if (window.location.hash === "#signup") setAuthRoute("signup");
   }, []);
 
   if (!mounted) return <SolawiseFrame />;
@@ -656,6 +938,8 @@ export default function PollarShell() {
       frameLoaded={frameLoaded}
       initialHash={initialHash}
       onFrameLoad={() => setFrameLoaded(true)}
+      authRoute={authRoute}
+      setAuthRoute={setAuthRoute}
     />
   );
 }
