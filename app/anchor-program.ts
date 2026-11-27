@@ -19,6 +19,7 @@ import idl from "../target/idl/solawise.json";
 import type { Solawise } from "../target/types/solawise";
 
 const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+const DEVNET_USDC_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 
 export type GoalSnapshot = {
   address: string;
@@ -193,12 +194,7 @@ function makeProgram(client: PollarClient, owner: PublicKey) {
 }
 
 function readMintAddress(): PublicKey {
-  const value = process.env.NEXT_PUBLIC_SOLAWISE_MINT;
-  if (!value) {
-    throw new Error(
-      "Set NEXT_PUBLIC_SOLAWISE_MINT to the SPL token mint used by SolaWise on devnet.",
-    );
-  }
+  const value = process.env.NEXT_PUBLIC_SOLAWISE_MINT || DEVNET_USDC_MINT;
   try {
     return new PublicKey(value);
   } catch {
