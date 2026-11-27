@@ -88,7 +88,6 @@ The app uses:
 
 - `@pollar/core`
 - `@pollar/react`
-- `@pollar/solana-wallet-standard-adapter`
 
 The browser provider uses a publishable test-mode key and cached client
 configuration. Email-code login verifies Pollar auth. Pollar wallets use
