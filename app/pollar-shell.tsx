@@ -66,6 +66,8 @@ function PollarBridge({
     wallets,
     getClient,
     walletBalance,
+    configStatus,
+    appConfig,
     login,
     logout,
     createWallet,
@@ -77,6 +79,7 @@ function PollarBridge({
     refreshWalletBalance,
   } = usePollar();
   const solanaWallet = wallets.find((wallet) => wallet.chain === "SOLANA");
+  const walletCreationStarted = useRef(false);
   const balances = useMemo(
     () =>
       walletBalance.step === "loaded"
@@ -117,6 +120,64 @@ function PollarBridge({
     solanaWallet?.custody,
     verified,
     walletBalance.step,
+  ]);
+
+  useEffect(() => {
+    if (!frameLoaded) return;
+    frameRef.current?.contentWindow?.postMessage(
+      {
+        type: "solawise:pollar-config",
+        status: configStatus,
+        message:
+          configStatus === "error"
+            ? "Pollar could not load this app’s settings. Add this site’s origin to the allowed origins in the Pollar dashboard, then reload."
+            : null,
+      },
+      window.location.origin,
+    );
+  }, [configStatus, frameLoaded, frameRef]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      walletCreationStarted.current = false;
+      return;
+    }
+
+    const application = appConfig.application;
+    if (
+      !verified ||
+      hasWallet ||
+      configStatus !== "ready" ||
+      application?.walletProvisioning !== "ON_DEMAND" ||
+      application.walletCustodyMode === "USER_CHOICE" ||
+      walletCreationStarted.current
+    ) {
+      return;
+    }
+
+    walletCreationStarted.current = true;
+    void createWallet().catch((error: unknown) => {
+      const frame = frameRef.current?.contentWindow;
+      if (!frame) return;
+      frame.postMessage(
+        {
+          type: "solawise:pollar-error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Could not create the Pollar Solana wallet.",
+        },
+        window.location.origin,
+      );
+    });
+  }, [
+    appConfig.application,
+    configStatus,
+    createWallet,
+    frameRef,
+    hasWallet,
+    isAuthenticated,
+    verified,
   ]);
 
   useEffect(() => {
@@ -418,6 +479,8 @@ function PollarBridge({
     return () => window.removeEventListener("message", onMessage);
   }, [
     createWallet,
+    appConfig,
+    configStatus,
     frameRef,
     getClient,
     isAuthenticated,

@@ -316,6 +316,277 @@ pub mod solawise {
         )?;
         Ok(())
     }
+
+    pub fn create_event(
+        ctx: Context<CreateEvent>,
+        event_id: u64,
+        title: String,
+        event_ts: i64,
+        ticket_price: u64,
+        capacity: u32,
+    ) -> Result<()> {
+        require!(
+            !title.trim().is_empty() && title.as_bytes().len() <= 64,
+            SolaError::InvalidEventTitle
+        );
+        require!(
+            event_ts > Clock::get()?.unix_timestamp,
+            SolaError::EventMustBeFuture
+        );
+        require!(
+            ticket_price > 0 && capacity > 0,
+            SolaError::InvalidEventTerms
+        );
+
+        let event = &mut ctx.accounts.event;
+        event.organizer = ctx.accounts.organizer.key();
+        event.mint = ctx.accounts.mint.key();
+        event.event_id = event_id;
+        event.title = title;
+        event.event_ts = event_ts;
+        event.ticket_price = ticket_price;
+        event.capacity = capacity;
+        event.sold_count = 0;
+        event.next_sale_id = 0;
+        event.status = EventStatus::Open;
+        event.bump = ctx.bumps.event;
+        Ok(())
+    }
+
+    pub fn buy_ticket(ctx: Context<BuyTicket>, ticket_id: u32, sale_id: u64) -> Result<()> {
+        let event = &ctx.accounts.event;
+        require!(event.status == EventStatus::Open, SolaError::EventNotOpen);
+        require!(
+            Clock::get()?.unix_timestamp < event.event_ts,
+            SolaError::EventAlreadyStarted
+        );
+        require!(event.sold_count < event.capacity, SolaError::SoldOut);
+        require!(ticket_id == event.sold_count, SolaError::InvalidTicketId);
+        require!(sale_id == event.next_sale_id, SolaError::InvalidSaleId);
+
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.buyer_ata.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                    authority: ctx.accounts.buyer.to_account_info(),
+                },
+            ),
+            event.ticket_price,
+        )?;
+
+        let event_key = event.key();
+        let organizer = event.organizer;
+        let ticket_price = event.ticket_price;
+        let ticket = &mut ctx.accounts.ticket;
+        ticket.event = event_key;
+        ticket.ticket_id = ticket_id;
+        ticket.owner = ctx.accounts.buyer.key();
+        ticket.face_price = ticket_price;
+        ticket.asking_price = 0;
+        ticket.status = TicketStatus::Active;
+        ticket.bump = ctx.bumps.ticket;
+
+        let sale = &mut ctx.accounts.sale;
+        sale.event = event_key;
+        sale.ticket = ticket.key();
+        sale.seller = organizer;
+        sale.buyer = ctx.accounts.buyer.key();
+        sale.amount = ticket_price;
+        sale.sale_id = sale_id;
+        sale.bump = ctx.bumps.sale;
+
+        let event = &mut ctx.accounts.event;
+        event.sold_count = event
+            .sold_count
+            .checked_add(1)
+            .ok_or(SolaError::MathOverflow)?;
+        event.next_sale_id = event
+            .next_sale_id
+            .checked_add(1)
+            .ok_or(SolaError::MathOverflow)?;
+        Ok(())
+    }
+
+    pub fn list_ticket(ctx: Context<ListTicket>, asking_price: u64) -> Result<()> {
+        let event = &ctx.accounts.event;
+        require!(event.status == EventStatus::Open, SolaError::EventNotOpen);
+        require!(
+            Clock::get()?.unix_timestamp < event.event_ts,
+            SolaError::EventAlreadyStarted
+        );
+        require!(
+            ctx.accounts.ticket.status == TicketStatus::Active,
+            SolaError::TicketNotActive
+        );
+        require!(asking_price > 0, SolaError::InvalidAmount);
+        let resale_cap = ctx
+            .accounts
+            .ticket
+            .face_price
+            .checked_add(ctx.accounts.ticket.face_price / 10)
+            .ok_or(SolaError::MathOverflow)?;
+        require!(asking_price <= resale_cap, SolaError::ResalePriceTooHigh);
+
+        let ticket = &mut ctx.accounts.ticket;
+        ticket.asking_price = asking_price;
+        ticket.status = TicketStatus::Listed;
+        Ok(())
+    }
+
+    pub fn unlist_ticket(ctx: Context<ListTicket>) -> Result<()> {
+        let event = &ctx.accounts.event;
+        require!(event.status == EventStatus::Open, SolaError::EventNotOpen);
+        require!(
+            Clock::get()?.unix_timestamp < event.event_ts,
+            SolaError::EventAlreadyStarted
+        );
+        require!(
+            ctx.accounts.ticket.status == TicketStatus::Listed,
+            SolaError::TicketNotListed
+        );
+
+        let ticket = &mut ctx.accounts.ticket;
+        ticket.asking_price = 0;
+        ticket.status = TicketStatus::Active;
+        Ok(())
+    }
+
+    pub fn buy_resale(ctx: Context<BuyResale>, sale_id: u64) -> Result<()> {
+        let event = &ctx.accounts.event;
+        require!(event.status == EventStatus::Open, SolaError::EventNotOpen);
+        require!(
+            Clock::get()?.unix_timestamp < event.event_ts,
+            SolaError::EventAlreadyStarted
+        );
+        require!(
+            ctx.accounts.ticket.status == TicketStatus::Listed,
+            SolaError::TicketNotListed
+        );
+        require!(
+            ctx.accounts.ticket.owner != ctx.accounts.buyer.key(),
+            SolaError::CannotBuyOwnTicket
+        );
+        require!(sale_id == event.next_sale_id, SolaError::InvalidSaleId);
+
+        let amount = ctx.accounts.ticket.asking_price;
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.buyer_ata.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                    authority: ctx.accounts.buyer.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
+        let event_key = event.key();
+        let previous_owner = ctx.accounts.ticket.owner;
+        let ticket = &mut ctx.accounts.ticket;
+        ticket.owner = ctx.accounts.buyer.key();
+        ticket.asking_price = 0;
+        ticket.status = TicketStatus::Active;
+
+        let sale = &mut ctx.accounts.sale;
+        sale.event = event_key;
+        sale.ticket = ticket.key();
+        sale.seller = previous_owner;
+        sale.buyer = ctx.accounts.buyer.key();
+        sale.amount = amount;
+        sale.sale_id = sale_id;
+        sale.bump = ctx.bumps.sale;
+
+        ctx.accounts.event.next_sale_id = ctx
+            .accounts
+            .event
+            .next_sale_id
+            .checked_add(1)
+            .ok_or(SolaError::MathOverflow)?;
+        Ok(())
+    }
+
+    pub fn cancel_event(ctx: Context<OrganizerEvent>) -> Result<()> {
+        require!(
+            ctx.accounts.event.status == EventStatus::Open,
+            SolaError::EventNotOpen
+        );
+        require!(
+            Clock::get()?.unix_timestamp < ctx.accounts.event.event_ts,
+            SolaError::EventAlreadyStarted
+        );
+        ctx.accounts.event.status = EventStatus::Cancelled;
+        Ok(())
+    }
+
+    pub fn complete_event(ctx: Context<CompleteEvent>) -> Result<()> {
+        require!(
+            ctx.accounts.event.status == EventStatus::Open,
+            SolaError::EventNotOpen
+        );
+        require!(
+            Clock::get()?.unix_timestamp >= ctx.accounts.event.event_ts,
+            SolaError::EventNotOver
+        );
+        ctx.accounts.event.status = EventStatus::Completed;
+        Ok(())
+    }
+
+    pub fn refund_ticket_sale(ctx: Context<RefundTicketSale>) -> Result<()> {
+        require!(
+            ctx.accounts.event.status == EventStatus::Cancelled,
+            SolaError::EventNotCancelled
+        );
+        let amount = ctx.accounts.sale.amount;
+        let (organizer, event_id, bump) = event_signer_seeds(&ctx.accounts.event);
+        let seeds: &[&[u8]] = &[b"event", &organizer, &event_id, &bump];
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.vault.to_account_info(),
+                    to: ctx.accounts.buyer_ata.to_account_info(),
+                    authority: ctx.accounts.event.to_account_info(),
+                },
+                &[seeds],
+            ),
+            amount,
+        )?;
+        Ok(())
+    }
+
+    pub fn settle_ticket_sale(ctx: Context<SettleTicketSale>) -> Result<()> {
+        require!(
+            ctx.accounts.event.status == EventStatus::Completed,
+            SolaError::EventNotCompleted
+        );
+        let amount = ctx.accounts.sale.amount;
+        let (organizer, event_id, bump) = event_signer_seeds(&ctx.accounts.event);
+        let seeds: &[&[u8]] = &[b"event", &organizer, &event_id, &bump];
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.vault.to_account_info(),
+                    to: ctx.accounts.seller_ata.to_account_info(),
+                    authority: ctx.accounts.event.to_account_info(),
+                },
+                &[seeds],
+            ),
+            amount,
+        )?;
+        Ok(())
+    }
+}
+
+fn event_signer_seeds(event: &Event) -> ([u8; 32], [u8; 8], [u8; 1]) {
+    (
+        event.organizer.to_bytes(),
+        event.event_id.to_le_bytes(),
+        [event.bump],
+    )
 }
 
 fn member_index(circle: &Circle, key: &Pubkey) -> Result<usize> {
@@ -345,6 +616,19 @@ pub enum CircleStatus {
     Open,
     Active,
     Completed,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum EventStatus {
+    Open,
+    Cancelled,
+    Completed,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum TicketStatus {
+    Active,
+    Listed,
 }
 
 #[account]
@@ -383,6 +667,55 @@ pub struct Circle {
 impl Circle {
     const SPACE: usize =
         32 + 32 + 8 + 1 + 1 + 8 + 8 + 8 + 1 + 1 + 8 + (Member::SPACE * MAX_MEMBERS) + 1;
+}
+
+#[account]
+pub struct Event {
+    pub organizer: Pubkey,
+    pub mint: Pubkey,
+    pub event_id: u64,
+    pub title: String,
+    pub event_ts: i64,
+    pub ticket_price: u64,
+    pub capacity: u32,
+    pub sold_count: u32,
+    pub next_sale_id: u64,
+    pub status: EventStatus,
+    pub bump: u8,
+}
+
+impl Event {
+    const SPACE: usize = 32 + 32 + 8 + 4 + 64 + 8 + 8 + 4 + 4 + 8 + 1 + 1;
+}
+
+#[account]
+pub struct Ticket {
+    pub event: Pubkey,
+    pub ticket_id: u32,
+    pub owner: Pubkey,
+    pub face_price: u64,
+    pub asking_price: u64,
+    pub status: TicketStatus,
+    pub bump: u8,
+}
+
+impl Ticket {
+    const SPACE: usize = 32 + 4 + 32 + 8 + 8 + 1 + 1;
+}
+
+#[account]
+pub struct TicketSale {
+    pub event: Pubkey,
+    pub ticket: Pubkey,
+    pub seller: Pubkey,
+    pub buyer: Pubkey,
+    pub amount: u64,
+    pub sale_id: u64,
+    pub bump: u8,
+}
+
+impl TicketSale {
+    const SPACE: usize = 32 + 32 + 32 + 32 + 8 + 8 + 1;
 }
 
 #[derive(Accounts)]
@@ -543,6 +876,233 @@ pub struct SettleRound<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[derive(Accounts)]
+#[instruction(event_id: u64)]
+pub struct CreateEvent<'info> {
+    #[account(mut)]
+    pub organizer: Signer<'info>,
+    pub mint: Account<'info, Mint>,
+    #[account(
+        init,
+        payer = organizer,
+        space = 8 + Event::SPACE,
+        seeds = [b"event", organizer.key().as_ref(), &event_id.to_le_bytes()],
+        bump
+    )]
+    pub event: Account<'info, Event>,
+    #[account(
+        init,
+        payer = organizer,
+        seeds = [b"event_vault", event.key().as_ref()],
+        bump,
+        token::mint = mint,
+        token::authority = event
+    )]
+    pub vault: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(ticket_id: u32, sale_id: u64)]
+pub struct BuyTicket<'info> {
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [b"event", event.organizer.as_ref(), &event.event_id.to_le_bytes()],
+        bump = event.bump
+    )]
+    pub event: Account<'info, Event>,
+    #[account(
+        init,
+        payer = buyer,
+        space = 8 + Ticket::SPACE,
+        seeds = [b"ticket", event.key().as_ref(), &ticket_id.to_le_bytes()],
+        bump
+    )]
+    pub ticket: Account<'info, Ticket>,
+    #[account(
+        init,
+        payer = buyer,
+        space = 8 + TicketSale::SPACE,
+        seeds = [b"ticket_sale", event.key().as_ref(), &sale_id.to_le_bytes()],
+        bump
+    )]
+    pub sale: Account<'info, TicketSale>,
+    #[account(
+        mut,
+        seeds = [b"event_vault", event.key().as_ref()],
+        bump,
+        token::mint = event.mint,
+        token::authority = event
+    )]
+    pub vault: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        token::mint = event.mint,
+        token::authority = buyer
+    )]
+    pub buyer_ata: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ListTicket<'info> {
+    pub owner: Signer<'info>,
+    #[account(
+        seeds = [b"event", event.organizer.as_ref(), &event.event_id.to_le_bytes()],
+        bump = event.bump
+    )]
+    pub event: Account<'info, Event>,
+    #[account(
+        mut,
+        seeds = [b"ticket", event.key().as_ref(), &ticket.ticket_id.to_le_bytes()],
+        bump = ticket.bump,
+        has_one = event,
+        constraint = ticket.owner == owner.key() @ SolaError::NotTicketOwner
+    )]
+    pub ticket: Account<'info, Ticket>,
+}
+
+#[derive(Accounts)]
+#[instruction(sale_id: u64)]
+pub struct BuyResale<'info> {
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [b"event", event.organizer.as_ref(), &event.event_id.to_le_bytes()],
+        bump = event.bump
+    )]
+    pub event: Account<'info, Event>,
+    #[account(
+        mut,
+        seeds = [b"ticket", event.key().as_ref(), &ticket.ticket_id.to_le_bytes()],
+        bump = ticket.bump,
+        has_one = event
+    )]
+    pub ticket: Account<'info, Ticket>,
+    #[account(
+        init,
+        payer = buyer,
+        space = 8 + TicketSale::SPACE,
+        seeds = [b"ticket_sale", event.key().as_ref(), &sale_id.to_le_bytes()],
+        bump
+    )]
+    pub sale: Account<'info, TicketSale>,
+    #[account(
+        mut,
+        seeds = [b"event_vault", event.key().as_ref()],
+        bump,
+        token::mint = event.mint,
+        token::authority = event
+    )]
+    pub vault: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        token::mint = event.mint,
+        token::authority = buyer
+    )]
+    pub buyer_ata: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct OrganizerEvent<'info> {
+    pub organizer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [b"event", event.organizer.as_ref(), &event.event_id.to_le_bytes()],
+        bump = event.bump,
+        has_one = organizer
+    )]
+    pub event: Account<'info, Event>,
+}
+
+#[derive(Accounts)]
+pub struct CompleteEvent<'info> {
+    pub caller: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [b"event", event.organizer.as_ref(), &event.event_id.to_le_bytes()],
+        bump = event.bump
+    )]
+    pub event: Account<'info, Event>,
+}
+
+#[derive(Accounts)]
+pub struct RefundTicketSale<'info> {
+    #[account(
+        seeds = [b"event", event.organizer.as_ref(), &event.event_id.to_le_bytes()],
+        bump = event.bump
+    )]
+    pub event: Account<'info, Event>,
+    #[account(
+        mut,
+        close = buyer,
+        seeds = [b"ticket_sale", event.key().as_ref(), &sale.sale_id.to_le_bytes()],
+        bump = sale.bump,
+        has_one = event,
+        has_one = buyer
+    )]
+    pub sale: Account<'info, TicketSale>,
+    #[account(
+        mut,
+        seeds = [b"event_vault", event.key().as_ref()],
+        bump,
+        token::mint = event.mint,
+        token::authority = event
+    )]
+    pub vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+    #[account(
+        mut,
+        token::mint = event.mint,
+        token::authority = buyer
+    )]
+    pub buyer_ata: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct SettleTicketSale<'info> {
+    #[account(
+        seeds = [b"event", event.organizer.as_ref(), &event.event_id.to_le_bytes()],
+        bump = event.bump
+    )]
+    pub event: Account<'info, Event>,
+    #[account(
+        mut,
+        close = seller,
+        seeds = [b"ticket_sale", event.key().as_ref(), &sale.sale_id.to_le_bytes()],
+        bump = sale.bump,
+        has_one = event,
+        has_one = seller
+    )]
+    pub sale: Account<'info, TicketSale>,
+    #[account(
+        mut,
+        seeds = [b"event_vault", event.key().as_ref()],
+        bump,
+        token::mint = event.mint,
+        token::authority = event
+    )]
+    pub vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub seller: Signer<'info>,
+    #[account(
+        mut,
+        token::mint = event.mint,
+        token::authority = seller
+    )]
+    pub seller_ata: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
 #[error_code]
 pub enum SolaError {
     #[msg("Name must be 32 bytes or fewer.")]
@@ -577,4 +1137,36 @@ pub enum SolaError {
     NotCompleted,
     #[msg("No collateral remains to claim.")]
     NothingToClaim,
+    #[msg("Event title must be between 1 and 64 bytes.")]
+    InvalidEventTitle,
+    #[msg("Event date must be in the future.")]
+    EventMustBeFuture,
+    #[msg("Ticket price and capacity must be greater than zero.")]
+    InvalidEventTerms,
+    #[msg("Event is not open.")]
+    EventNotOpen,
+    #[msg("The event has already started.")]
+    EventAlreadyStarted,
+    #[msg("All tickets have been sold.")]
+    SoldOut,
+    #[msg("Ticket ID is not the next available ticket.")]
+    InvalidTicketId,
+    #[msg("Sale ID is not the next available sale.")]
+    InvalidSaleId,
+    #[msg("Ticket is not active.")]
+    TicketNotActive,
+    #[msg("Ticket is not listed for resale.")]
+    TicketNotListed,
+    #[msg("Resale price exceeds the 10% cap.")]
+    ResalePriceTooHigh,
+    #[msg("You already own this ticket.")]
+    CannotBuyOwnTicket,
+    #[msg("Wallet does not own this ticket.")]
+    NotTicketOwner,
+    #[msg("Event has not ended yet.")]
+    EventNotOver,
+    #[msg("Event has not been cancelled.")]
+    EventNotCancelled,
+    #[msg("Event has not been marked complete.")]
+    EventNotCompleted,
 }

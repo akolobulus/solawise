@@ -236,4 +236,254 @@ describe("solawise", () => {
     }
     assert.equal(await balance(vault), 0, "circle vault is drained");
   });
+
+  it("caps ticket resale and fully refunds each sale when an event is cancelled", async function () {
+    this.timeout(60_000);
+    const [organizer, firstBuyer, secondBuyer] = [
+      await createUser(),
+      await createUser(),
+      await createUser(),
+    ];
+    const eventId = 18;
+    const event = pda([
+      Buffer.from("event"),
+      organizer.keypair.publicKey.toBuffer(),
+      u64(eventId),
+    ]);
+    const vault = pda([Buffer.from("event_vault"), event.toBuffer()]);
+    const ticket = pda([
+      Buffer.from("ticket"),
+      event.toBuffer(),
+      Buffer.from([0, 0, 0, 0]),
+    ]);
+    const sale0 = pda([
+      Buffer.from("ticket_sale"),
+      event.toBuffer(),
+      u64(0),
+    ]);
+    const sale1 = pda([
+      Buffer.from("ticket_sale"),
+      event.toBuffer(),
+      u64(1),
+    ]);
+    const eventTs = Math.floor(Date.now() / 1_000) + 30;
+
+    await program.methods
+      .createEvent(new BN(eventId), "Community Music Night", new BN(eventTs), new BN(1_000), 2)
+      .accountsPartial({
+        organizer: organizer.keypair.publicKey,
+        mint,
+        event,
+        vault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([organizer.keypair])
+      .rpc();
+
+    await program.methods
+      .buyTicket(0, new BN(0))
+      .accountsPartial({
+        buyer: firstBuyer.keypair.publicKey,
+        event,
+        ticket,
+        sale: sale0,
+        vault,
+        buyerAta: firstBuyer.tokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([firstBuyer.keypair])
+      .rpc();
+
+    let resaleRejected = false;
+    try {
+      await program.methods
+        .listTicket(new BN(1_101))
+        .accountsPartial({
+          owner: firstBuyer.keypair.publicKey,
+          event,
+          ticket,
+        })
+        .signers([firstBuyer.keypair])
+        .rpc();
+    } catch {
+      resaleRejected = true;
+    }
+    assert.isTrue(resaleRejected, "resale above 110% of face value must fail");
+
+    await program.methods
+      .listTicket(new BN(1_100))
+      .accountsPartial({
+        owner: firstBuyer.keypair.publicKey,
+        event,
+        ticket,
+      })
+      .signers([firstBuyer.keypair])
+      .rpc();
+    await program.methods
+      .unlistTicket()
+      .accountsPartial({
+        owner: firstBuyer.keypair.publicKey,
+        event,
+        ticket,
+      })
+      .signers([firstBuyer.keypair])
+      .rpc();
+
+    await program.methods
+      .listTicket(new BN(1_100))
+      .accountsPartial({
+        owner: firstBuyer.keypair.publicKey,
+        event,
+        ticket,
+      })
+      .signers([firstBuyer.keypair])
+      .rpc();
+
+    await program.methods
+      .buyResale(new BN(1))
+      .accountsPartial({
+        buyer: secondBuyer.keypair.publicKey,
+        event,
+        ticket,
+        sale: sale1,
+        vault,
+        buyerAta: secondBuyer.tokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([secondBuyer.keypair])
+      .rpc();
+    assert.equal(await balance(vault), 2_100);
+
+    await program.methods
+      .cancelEvent()
+      .accountsPartial({
+        organizer: organizer.keypair.publicKey,
+        event,
+      })
+      .signers([organizer.keypair])
+      .rpc();
+
+    const refund = async (
+      sale: PublicKey,
+      buyer: (typeof firstBuyer) | (typeof secondBuyer),
+    ) =>
+      program.methods
+        .refundTicketSale()
+        .accountsPartial({
+          event,
+          sale,
+          vault,
+          buyer: buyer.keypair.publicKey,
+          buyerAta: buyer.tokenAccount,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([buyer.keypair])
+        .rpc();
+
+    await refund(sale0, firstBuyer);
+    await refund(sale1, secondBuyer);
+    assert.equal(await balance(firstBuyer.tokenAccount), START);
+    assert.equal(await balance(secondBuyer.tokenAccount), START);
+    assert.equal(await balance(vault), 0);
+    assert.isNull(await connection.getAccountInfo(sale0));
+    assert.isNull(await connection.getAccountInfo(sale1));
+  });
+
+  it("pays ticket sale proceeds to the seller only after the event ends", async function () {
+    this.timeout(60_000);
+    const [organizer, buyer] = [await createUser(), await createUser()];
+    const eventId = 19;
+    const event = pda([
+      Buffer.from("event"),
+      organizer.keypair.publicKey.toBuffer(),
+      u64(eventId),
+    ]);
+    const vault = pda([Buffer.from("event_vault"), event.toBuffer()]);
+    const ticket = pda([
+      Buffer.from("ticket"),
+      event.toBuffer(),
+      Buffer.from([0, 0, 0, 0]),
+    ]);
+    const sale = pda([
+      Buffer.from("ticket_sale"),
+      event.toBuffer(),
+      u64(0),
+    ]);
+    const eventTs = Math.floor(Date.now() / 1_000) + 4;
+
+    await program.methods
+      .createEvent(new BN(eventId), "Community Workshop", new BN(eventTs), new BN(2_000), 1)
+      .accountsPartial({
+        organizer: organizer.keypair.publicKey,
+        mint,
+        event,
+        vault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([organizer.keypair])
+      .rpc();
+    await program.methods
+      .buyTicket(0, new BN(0))
+      .accountsPartial({
+        buyer: buyer.keypair.publicKey,
+        event,
+        ticket,
+        sale,
+        vault,
+        buyerAta: buyer.tokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([buyer.keypair])
+      .rpc();
+
+    let earlySettlementRejected = false;
+    try {
+      await program.methods
+        .settleTicketSale()
+        .accountsPartial({
+          event,
+          sale,
+          vault,
+          seller: organizer.keypair.publicKey,
+          sellerAta: organizer.tokenAccount,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([organizer.keypair])
+        .rpc();
+    } catch {
+      earlySettlementRejected = true;
+    }
+    assert.isTrue(earlySettlementRejected, "sale proceeds must stay escrowed before event end");
+
+    await sleep(5);
+    await program.methods
+      .completeEvent()
+      .accountsPartial({
+        caller: organizer.keypair.publicKey,
+        event,
+      })
+      .signers([organizer.keypair])
+      .rpc();
+    await program.methods
+      .settleTicketSale()
+      .accountsPartial({
+        event,
+        sale,
+        vault,
+        seller: organizer.keypair.publicKey,
+        sellerAta: organizer.tokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([organizer.keypair])
+      .rpc();
+
+    assert.equal(await balance(buyer.tokenAccount), START - 2_000);
+    assert.equal(await balance(organizer.tokenAccount), START + 2_000);
+    assert.equal(await balance(vault), 0);
+  });
 });

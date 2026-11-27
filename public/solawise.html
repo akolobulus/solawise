@@ -151,7 +151,7 @@ a.av{color:#fff}
 .ldr a{padding:14px 12px;border-radius:12px;font-weight:500}.ldr a:not(.btn):hover{background:var(--bt);color:var(--blue)}
 .chat{max-width:720px}.msgs{display:flex;flex-direction:column;gap:10px;margin:18px 0;min-height:120px}
 .bb2{max-width:88%;padding:12px 16px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45}
-.bb2.u{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px}.bb2.a{align-self:flex-start;background:var(--bt);border-bottom-left-radius:4px}
+.bb2.u{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px}.bb2.a{align-self:flex-start;background:var(--bt);border-bottom-left-radius:4px}.bb2.err{align-self:flex-start;background:#fff0ed;color:#9a3412;border:1px solid #fed7aa}
 .cin{display:flex;gap:8px;align-items:center;position:sticky;bottom:0;background:var(--card);padding:10px 0}.cin input{flex:1;min-width:0}
 @media(max-width:860px){.hb{display:grid}.nv .rt a:first-child{display:none}.nv .rt{gap:8px}
 .side{display:flex!important;position:fixed!important;left:0;top:0;bottom:0;height:auto!important;width:min(300px,84vw);background:var(--card);z-index:40;transform:translateX(-102%);visibility:hidden;transition:transform .3s,visibility .3s;overflow-y:auto;padding-top:calc(16px + env(safe-area-inset-top,0px))}
@@ -231,41 +231,45 @@ a.av{color:#fff}
 const R=['home','save','invest','pay','ai','events','stash','profile','prefs'];
 const IC={home:'home',save:'savings',invest:'trending_up',pay:'payments',ai:'auto_awesome',events:'confirmation_number',stash:'account_balance_wallet',profile:'person',prefs:'settings'};
 const LB={home:'Home',save:'Save',invest:'Invest',pay:'Pay',ai:'Assistant',events:'Events',stash:'Stash',profile:'Profile',prefs:'Settings'};
-const S={bal:250000,show:true,tab:'home',goals:[{n:'Emergency',c:'--rt',t:0,s:0,d:'—',e:'umbrella'},{n:'Home',c:'--gt',t:0,s:0,d:'—',e:'home'},{n:'Study',c:'--at',t:0,s:0,d:'—',e:'school'}],
-circles:[{n:'Money Duo',c:'--rt',m:['You','Tunde'],a:20000,p:0,e:'favorite'},{n:'Football',c:'--gt',m:['You','Musa','Kemi','Ola'],a:10000,p:0,e:'sports_soccer'}],
-inv:0,tix:[],tx:[{k:'in',t:'Cash in via ramp',d:'Nov 21',a:250000}],
-ev:[{n:'Detty December Fest',w:'Dec 27 · Lagos',p:35000,e:'music_note',c:'--yt'},{n:'Afro Nation Night',w:'Dec 30 · Lekki',p:50000,e:'local_fire_department',c:'--rt'},{n:'Tech & Chill Meetup',w:'Jan 10 · Yaba',p:8000,e:'laptop_mac',c:'--bt'},{n:'Naija Food Fair',w:'Jan 17 · Abuja',p:5000,e:'restaurant',c:'--gt'}],
-st:[{n:'Stable Yield',d:'USDC lending vault',r:'6.5%',c:'--gt'},{n:'Tokenized Treasuries',d:'Short-term govt bonds',r:'4.8%',c:'--bt'},{n:'Naira Basket',d:'cNGN yield strategy',r:'12%',c:'--yt'}]};
-const N=x=>'₦'+Math.round(x).toLocaleString('en-NG'),$=id=>document.getElementById(id);
-const bal=()=>S.show?N(S.bal):'••••';
+const S={chat:[]};
+const $=id=>document.getElementById(id);
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.append(t);setTimeout(()=>t.remove(),2200)}
 function modal(h){const m=document.createElement('div');m.className='mask';m.innerHTML='<div class="dlg" role="dialog" aria-modal="true">'+h+'</div>';m.onclick=e=>{if(e.target==m||e.target.dataset.x!=null)m.remove()};document.body.append(m);const i=m.querySelector('input');i&&i.focus();return m}
-function cash(a,t){S.bal+=a;S.tx.unshift({k:'in',t:t||'Cash in via ramp',d:'Today',a});toast(N(a)+' added');go()}
-function addCash(){const m=modal(`<h3>Add cash</h3><p class="mut">Demo: cash-in will run through Pollar’s local ramp.</p><label>Amount (₦)</label><input id="a" type="number" value="20000" min="100"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Add cash</button></div>`);m.querySelector('#ok').onclick=()=>{const a=+m.querySelector('#a').value;if(a>0){m.remove();cash(a)}}}
-const chips=()=>`<div class="chips">${[20000,50000,100000].map(a=>`<button class="chip" onclick="cash(${a})">Demo +${N(a)}</button>`).join('')}${[100,200].map(a=>`<button class="chip" onclick="cash(${a*FX},'Demo cash in ($${a})')">Demo +$${a}</button>`).join('')}<button class="chip" onclick="addCash()" aria-label="Add demo amount">+</button></div>`;
-function pay(a,t,k){if(a>S.bal){toast('Not enough balance. Add cash first.');return false}S.bal-=a;S.tx.unshift({k:'out',t,d:'Today',a});return true}
-function newGoal(){const m=modal(`<h3>New goal</h3><label>Goal name</label><input id="n" placeholder="Rent, laptop, trip"><label>Target (₦)</label><input id="t" type="number" value="500000"><label>Maturity date</label><input id="d" type="date"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Create goal</button></div>`);m.querySelector('#ok').onclick=()=>{const n=m.querySelector('#n').value.trim(),d=m.querySelector('#d').value;if(!n||!d)return toast('Add a name and a maturity date');S.goals.push({n,c:'--bt',t:+m.querySelector('#t').value,s:0,d,e:'flag'});m.remove();go()}}
-function goal(i){const g=S.goals[i];const m=modal(`<h3>${g.n}</h3><p class="mut">${g.t?`Locked until ${g.d}. Saved ${N(g.s)} of ${N(g.t)}.`:'Empty goal. Set a target by creating a new one.'}</p><label>Save from balance (₦)</label><input id="a" type="number" value="10000"><div class="row"><button class="btn o" data-x>Close</button><button class="btn" id="ok">Lock funds</button></div>`);m.querySelector('#ok').onclick=()=>{const a=+m.querySelector('#a').value;if(a>0&&pay(a,'Locked in '+g.n)){g.s+=a;m.remove();go()}}}
-function newCircle(){const m=modal(`<h3>New ajo circle</h3><label>Circle name</label><input id="n" placeholder="Office ajo"><label>Members</label><select id="m"><option>3</option><option selected>5</option><option>8</option><option>10</option></select><label>Contribution per cycle (₦)</label><input id="a" type="number" value="20000"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Create circle</button></div>`);m.querySelector('#ok').onclick=()=>{const n=m.querySelector('#n').value.trim();if(!n)return toast('Name your circle');const k=+m.querySelector('#m').value;S.circles.push({n,c:'--yt',m:['You',...Array.from({length:k-1},(_,i)=>'Member '+(i+2))],a:+m.querySelector('#a').value,p:0,e:'group'});m.remove();go()}}
-function circle(i){const c=S.circles[i],who=c.m[c.p%c.m.length];const m=modal(`<h3>${c.n}</h3><p class="mut">${N(c.a)} each cycle · pot ${N(c.a*c.m.length)}. Collateral is locked when you join.</p><div class="rows">${c.m.map((x,j)=>`<div><span>${j+1}. ${x}</span><span class="mut">${j<c.p%c.m.length?'Received':j==c.p%c.m.length?'Receives this cycle':'Waiting'}</span></div>`).join('')}</div><div class="row"><button class="btn o" data-x>Close</button><button class="btn" id="ok">Contribute ${N(c.a)}</button></div>`);m.querySelector('#ok').onclick=()=>{if(pay(c.a,'Ajo: '+c.n)){c.p++;m.remove();toast(who+' receives the pot');go()}}}
-function invest(i){const s=S.st[i];const m=modal(`<h3>${s.n}</h3><p class="mut">${s.d}. Estimated ${s.r} a year (demo rate).</p><label>Amount (₦)</label><input id="a" type="number" value="25000"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Invest</button></div>`);m.querySelector('#ok').onclick=()=>{const a=+m.querySelector('#a').value;if(a>0&&pay(a,'Invested in '+s.n)){S.inv+=a;m.remove();go()}}}
-function buy(i){const e=S.ev[i];if(pay(e.p,'Ticket: '+e.n)){S.tix.push(e);toast('Ticket bought');go()}}
-function send(){const m=modal(`<h3>Send money</h3><label>Username</label><input id="u" placeholder="@tunde"><label>Amount (₦)</label><input id="a" type="number" value="5000"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Send</button></div>`);m.querySelector('#ok').onclick=()=>{const u=m.querySelector('#u').value.trim(),a=+m.querySelector('#a').value;if(!u||!(a>0))return toast('Enter a username and amount');if(pay(a,'Sent to '+u)){m.remove();go()}}}
-S.usd=120;
-const BILLS=[{k:'Electricity',e:'bolt',c:'--yt',p:['Ikeja Electric','Eko DisCo','Abuja DisCo'],l:'Meter number'},{k:'Airtime',e:'call',c:'--gt',p:['MTN','Airtel','Glo','9mobile'],l:'Phone number'},{k:'Data',e:'signal_cellular_alt',c:'--bt',p:['MTN','Airtel','Glo','9mobile'],l:'Phone number'},{k:'Cable TV',e:'tv',c:'--rt',p:['DStv','GOtv','StarTimes'],l:'Smartcard number'},{k:'Internet',e:'language',c:'--at',p:['Spectranet','Smile'],l:'Account ID'}];
-function convert(){const m=modal(`<h3>Convert crypto to naira</h3><p class="mut">Demo rate ₦${FX} per $1 with a 0.5% fee. You hold $${S.usd.toFixed(2)}.</p><label>Token</label><select id="t"><option>USDC</option><option>USDT</option></select><label>Amount ($)</label><input id="a" type="number" value="50" min="1"><p id="o" style="margin-top:12px;font-weight:600"></p><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Convert</button></div>`);const a=m.querySelector("#a"),o=m.querySelector("#o"),up=()=>o.textContent="You get "+N((+a.value||0)*FX*.995);a.oninput=up;up();m.querySelector("#ok").onclick=()=>{const v=+a.value;if(!(v>0))return;if(v>S.usd)return toast("Not enough stablecoins");S.usd-=v;const n=v*FX*.995;S.bal+=n;S.tx.unshift({k:"in",t:"Converted $"+v+" "+m.querySelector("#t").value,d:"Today",a:n});m.remove();toast(N(n)+" added");go()}}
-function bill(i){const b=BILLS[i];const m=modal(`<h3>${b.k}</h3><label>Provider</label><select id="p">${b.p.map(x=>"<option>"+x+"</option>").join("")}</select><label>${b.l}</label><input id="n" placeholder="Enter number"><label>Amount (₦)</label><input id="a" type="number" value="${b.k=="Electricity"?5000:1000}"><label>Pay with</label><select id="w"><option value="n">Naira balance (${N(S.bal)})</option><option value="s">Stablecoins ($${S.usd.toFixed(2)})</option></select><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Pay bill</button></div>`);m.querySelector("#ok").onclick=()=>{const a=+m.querySelector("#a").value,n=m.querySelector("#n").value.trim(),w=m.querySelector("#w").value,p=m.querySelector("#p").value;if(!(a>0)||!n)return toast("Enter the number and amount");if(w=="n"){if(!pay(a,b.k+": "+p))return}else{const u=a/FX;if(u>S.usd)return toast("Not enough stablecoins");S.usd-=u;S.tx.unshift({k:"out",t:b.k+": "+p+" (USDC)",d:"Today",a})}m.remove();toast(b.k=="Electricity"?"Paid. Token: "+String(Math.random()).slice(2,18):"Payment successful");go()}}
-S.chat=[];let BUSY=0,DM=0;
-function bub(r,t){const d=document.createElement("div");d.className="bb2 "+r;d.textContent=t;$("msgs").append(d);d.scrollIntoView({block:"nearest"});return d}
-const fb=q=>{q=q.toLowerCase();return q.includes("ajo")?"An ajo circle rotates contributions to members in join order. On SolaWise devnet, the program can hold collateral and cover a missed contribution, but each participant must sign with an external Solana wallet.":q.includes("convert")||q.includes("usdc")||q.includes("bill")?"Pollar only displays payment and ramp routes enabled for this app. Nigerian naira rails and bill providers are not currently connected, so SolaWise cannot claim or simulate a successful payment.":"Set a clear savings target and maturity date, then use a devnet SPL token in an on-chain Goal. Check the token mint and wallet carefully before signing."};
-async function ask(q){q=(q||$("q").value).trim();if(!q||BUSY)return;$("q").value="";S.chat.push({role:"user",content:q});bub("u",q);const out=bub("a","Thinking…");BUSY=1;let t;
-try{const sm=await claude.use("sample");if(!sm)throw 0;
-const snapshot=programUiState.snapshot;
-const ctx="Current chain: Solana devnet; wallet: "+(pollarUiState.walletAddress||"not connected")+"; on-chain goal accounts: "+(snapshot?.goals?.length??"unavailable")+"; ajo circles: "+(snapshot?.circles?.length??"unavailable")+"; live Solana yield provider: unavailable; NGN bill payment integration: unavailable.";
-const sys="You are SolaWise Assistant, a warm, plain-spoken guide to savings and rotating ajo circles. Be empathetic and concise (under 120 words). Never claim a payment, bill, Naira conversion, investment, or ticket succeeded. Never promise returns. SolaWise currently uses Solana devnet test tokens; explain that every on-chain transaction requires the user's wallet approval. User data: "+ctx;
-const r=await sm(sys+"\n\nConversation so far:\n"+S.chat.slice(0,-1).slice(-8).map(m=>m.role+": "+m.content).join("\n")+"\n\nuser: "+q,{cache:false,onText:({text})=>{out.textContent=text}});t=r.text}catch(e){t=fb(q)}
-out.textContent=t;S.chat.push({role:"assistant",content:t});BUSY=0}
-async function mic(){try{const d=await claude.use("dictation");if(!d)return toast("Voice input isn’t available here");if(!DM){DM=1;d.onFinal(({text})=>{$("q").value+=text+" "})}await d.start()}catch(e){toast("Voice input isn’t available here")}}
+let BUSY=0,DM=0,AI_ERROR='';
+async function ask(q){
+ const input=$("q"),text=(q||input?.value||"").trim();
+ if(!text||BUSY)return;
+ if(text.length>2000){AI_ERROR="Keep each message under 2,000 characters.";go();return}
+ if(input)input.value="";
+ S.chat.push({role:"user",content:text});
+ AI_ERROR="";BUSY=1;go();
+ try{
+  const response=await fetch("/api/assistant",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({messages:S.chat.slice(-12)}),
+  });
+  const result=await response.json();
+  if(!response.ok)throw new Error(typeof result.error==="string"?result.error:"AI request failed.");
+  if(typeof result.content!=="string"||!result.content.trim())throw new Error("The AI provider returned an empty response.");
+  S.chat.push({role:"assistant",content:result.content.trim()});
+ }catch(error){
+  AI_ERROR=error instanceof Error?error.message:"AI request failed. Please try again.";
+ }finally{
+  BUSY=0;go();
+ }
+}
+function mic(){
+ const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SpeechRecognition)return toast("Voice input is not supported by this browser.");
+ if(!DM){
+  const recognition=new SpeechRecognition();recognition.lang="en-NG";recognition.interimResults=false;
+  recognition.onresult=event=>{const transcript=event.results[0]?.[0]?.transcript;if(transcript)$("q").value=($("q").value+" "+transcript).trim()};
+  recognition.onerror=()=>toast("Could not recognize speech. Try typing your question.");
+  DM=recognition;
+ }
+ DM.start();
+}
 let TH="system";try{TH=localStorage.getItem("sw-theme")||"system"}catch(e){}
 if(TH!="system")document.documentElement.dataset.theme=TH;
 function setTheme(t){TH=t;const r=document.documentElement;t=="system"?r.removeAttribute("data-theme"):r.dataset.theme=t;try{localStorage.setItem("sw-theme",t)}catch(e){}go()}
@@ -274,7 +278,7 @@ const card=(x,fn,sub)=>`<button class="gc" style="background:var(${x.c})" onclic
 const plus=f=>`<button class="gc add" onclick="${f}" aria-label="Create new">+</button>`;
 const hdr=()=>`<div class="two"><div><p class="mut">Demo naira balance</p><b style="font-size:30px">${bal()}</b></div><div><b style="font-size:20px">Demo cash in</b><div style="margin-top:12px">${chips()}</div></div></div>`;
 function qr(){let h='';const s=Math.floor(Date.now()/5000);for(let i=0;i<81;i++){const r=i%9,c=(i/9|0);const f=(r<3&&c<3)||(r>5&&c<3)||(r<3&&c>5);h+=`<i class="${f||((s*31+i*i*7+i*13)%5<2)?'k':''}"></i>`}return h}
-const V={
+const legacyViews={
 home(){const tot=S.bal+S.inv+S.goals.reduce((a,g)=>a+g.s,0)+S.circles.reduce((a,c)=>a+c.p*c.a,0);
 return `<div class="tabs"><button class="${S.tab=='home'?'on':''}" onclick="S.tab='home';go()">Home</button><button class="${S.tab=='port'?'on':''}" onclick="S.tab='port';go()">Portfolio</button></div>
 <div class="two"><div>${S.tab=='home'?`<div class="bal"><div class="t"><span>Demo Naira balance <button onclick="S.show=!S.show;go()" aria-label="Show or hide balance"><span class="ms" style="font-size:20px">${S.show?"visibility":"visibility_off"}</span></button></span><span><span class="ms" style="font-size:18px">bolt</span> 5</span></div><div class="n">${bal()}</div><svg viewBox="0 0 400 110" preserveAspectRatio="none"><path d="M0 40H110C120 40 120 80 130 80H260C270 80 270 105 280 105H400V110H0Z" fill="rgba(255,255,255,.2)"/></svg><span class="tag">Locked in goals: ${S.show?N(S.goals.reduce((a,g)=>a+g.s,0)):'••••'}</span></div>
@@ -288,6 +292,7 @@ ai(){return `<div class="chat"><b style="font-size:24px">Hi Ada, how can I help?
 prefs(){const o=[["system","System","brightness_auto"],["light","Light","light_mode"],["dark","Dark","dark_mode"]];return `<div style="max-width:560px"><h3 class="s" style="margin-top:0">Appearance</h3><p class="mut">Choose how SolaWise looks on this device.</p><div class="seg" role="radiogroup" aria-label="Theme">${o.map(([v,l,i])=>`<button role="radio" aria-checked="${TH==v}" class="${TH==v?"on":""}" onclick="setTheme('${v}')"><span class="ms">${i}</span>${l}</button>`).join("")}</div><a class="btn o" href="#login" style="margin-top:32px">Sign out</a></div>`},
 pay(){return pollarWalletPanel()+`<h3 class="s">Demo services (not connected to Pollar)</h3><div class="two"><div><p class="mut">Simulated stablecoin balance</p><b style="font-size:30px">${S.show?"$"+S.usd.toFixed(2):"••••"}</b><p class="mut" style="margin-top:4px">≈ ${S.show?N(S.usd*FX):"••••"}</p><div class="box"><b style="font-size:20px">Convert crypto to naira</b><p class="mut">Demo rate ₦${FX} per $1. No Naira on/off-ramp is connected.</p><div class="chips" style="margin-top:12px"><button class="btn" onclick="convert()">Run demo conversion</button><button class="btn o" onclick="S.usd+=50;toast('$50 demo USDC received');go()">Get demo USDC</button></div></div></div><div><b style="font-size:20px">Simulated naira balance</b><p style="font-size:26px;font-weight:700;margin-top:4px">${bal()}</p><p class="mut">Not your on-chain wallet balance.</p></div></div><h3 class="s">Simulated bill payments</h3><div class="grid">${BILLS.map((b,i)=>`<button class="gc" style="background:var(${b.c})" onclick="bill(${i})"><span class="ms" style="font-size:34px">${b.e}</span><b>${b.k}</b><em>Simulation only</em></button>`).join("")}</div><p class="mut" style="margin-top:20px">These demo actions do not move funds. Pollar payment modals above send actual supported Solana assets.</p>`},
 profile(){return `<div style="max-width:560px" class="rows"><div><span>Username</span><b>@ada</b></div><div><span>Phone</span><b>Sign in with Pollar</b></div><div><span>Wallet</span><b>Not connected</b></div><div><span>Network</span><b>Solana devnet</b></div><div><span>Program ID</span><b style="word-break:break-all">Paste after anchor deploy</b></div></div>`}};
+const V={prefs:legacyViews.prefs};
 function go(){drawer(0,'l');drawer(0,'a');const h=location.hash.slice(1),on=R.includes(h);const au=h=='login'||h=='signup';$('landing').classList.toggle('hide',on||au);$('auth').classList.toggle('hide',!au);$('v-login').classList.toggle('hide',h!='login');$('v-signup').classList.toggle('hide',h!='signup');if(au){scrollTo(0,0);if(lastAuthRoute!==h){clearAuthForms();pollarAuthMode=h;lastAuthRoute=h}}else lastAuthRoute='';$('app').classList.toggle('hide',!on);if(!on){if(!h||h=='landing')scrollTo(0,0);return}
 const nv=R.map(r=>`<a class="nav ${r==h?'on':''}" href="#${r}"><span class="ms">${IC[r]}</span>${LB[r]}</a>`).join('');$('nav').innerHTML=nv;$('mnav').innerHTML=nv;$('ttl').textContent=h=='home'?'Account overview':LB[h];$('view').innerHTML=V[h]()}
 addEventListener('hashchange',()=>{go();if(R.includes(location.hash.slice(1)))scrollTo(0,0)});
@@ -304,7 +309,7 @@ function drawer(on,w){const d=w=='l'?$('ldr'):document.querySelector('.side');d.
 $('lhb').onclick=()=>drawer(1,'l');$('abtn').onclick=()=>drawer(1,'a');$('dx').onclick=()=>drawer(0,'a');$('ov').onclick=()=>{drawer(0,'l');drawer(0,'a')};
 addEventListener('keydown',e=>{if(e.key=='Escape'){drawer(0,'l');drawer(0,'a')}});
 
-let pollarUiState={isAuthenticated:false,verified:false,walletAddress:null,walletCustody:null};
+let pollarUiState={isAuthenticated:false,verified:false,hasWallet:false,walletAddress:null,walletCustody:null,configStatus:'loading',configMessage:null};
 function pollarAction(action){
  if(!pollarUiState.isAuthenticated){location.hash='login';return}
  if(window.parent===window){toast('Pollar payments are available on the SolaWise app page.');return}
@@ -314,10 +319,10 @@ function pollarWalletPanel(){
  const state=pollarUiState;
  const header=`<div class="two"><div><p class="mut">Pollar Solana wallet</p><b style="font-size:20px">${state.walletAddress?escapePollarValue(state.walletAddress):'Wallet not connected'}</b></div><div class="chips"><button class="btn" onclick="pollarAction('send')">Send</button><button class="btn o" onclick="pollarAction('receive')">Receive</button></div></div>`;
  if(!state.isAuthenticated){
-  return `<div class="box"><h3 class="s" style="margin-top:0">Your on-chain wallet</h3><p class="mut">Sign in with Pollar to see balances and send or receive Solana assets.</p><button class="btn" style="margin-top:14px" onclick="location.hash='login'">Sign in with Pollar</button></div>`;
+  return `<div class="box"><h3 class="s" style="margin-top:0">Your on-chain wallet</h3><p class="mut">Sign in with Pollar to create or connect a wallet and see your Solana balances.</p>${state.configMessage?`<p class="mut" role="status" style="margin-top:10px">${escapePollarValue(state.configMessage)}</p>`:''}<button class="btn" style="margin-top:14px" onclick="location.hash='login'">Sign in with Pollar</button></div>`;
  }
  if(!state.hasWallet){
-  return `<div class="box"><h3 class="s" style="margin-top:0">Activate your Solana wallet</h3><p class="mut">Your Pollar account is signed in, but this app has not provisioned a wallet yet.</p><button class="btn" style="margin-top:14px" onclick="pollarAction('create-wallet')">Create wallet</button></div>`;
+  return `<div class="box"><h3 class="s" style="margin-top:0">Create your Pollar Solana wallet</h3><p class="mut">Your Pollar account is signed in, but no wallet is provisioned yet. Wallet creation is subject to the app’s Pollar dashboard settings.</p>${state.configMessage?`<p class="mut" role="status" style="margin-top:10px">${escapePollarValue(state.configMessage)}</p>`:''}<button class="btn" style="margin-top:14px" onclick="pollarAction('create-wallet')">Create Pollar wallet</button></div>`;
  }
  const assets=state.balances.filter(balance=>balance.chain==='SOLANA');
  const rows=assets.map(asset=>`<div class="tx"><i class="in"><span class="ms">account_balance_wallet</span></i><div>${escapePollarValue(asset.code)}<small>Solana · on-chain balance</small></div><b>${asset.balance===null?'Unavailable':escapePollarValue(asset.balance)}</b></div>`).join('');
@@ -378,19 +383,9 @@ if(typeof message.email==='string'){
  if(field)field.value=message.email;
 }
 }
-const originalProfile=V.profile;
 function escapePollarValue(value){
  return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 }
-V.profile=()=>{
- const markup=originalProfile();
- const wallet=pollarUiState.walletAddress
-  ?escapePollarValue(pollarUiState.walletAddress)
-  :pollarUiState.isAuthenticated?'Creating Solana wallet…':'Not connected';
- return markup
-  .replace('Not connected',wallet)
-  .replace('Sign in with Pollar',pollarUiState.isAuthenticated?'Signed in with Pollar':'Pollar sign-in');
-};
 addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==parent||!event.data||typeof event.data!=='object')return;
  const message=event.data;
@@ -402,8 +397,16 @@ addEventListener('message',event=>{
  }else if(message.type==='solawise:pollar-require-login'){
   location.hash='login';
   toast('Sign in with email or connect a Solana wallet to continue.');
+ }else if(message.type==='solawise:pollar-config'){
+  pollarUiState.configStatus=message.status==='ready'?'ready':message.status==='error'?'error':'loading';
+  pollarUiState.configMessage=typeof message.message==='string'?message.message:null;
+  if(pollarUiState.configStatus==='error'&&(location.hash==='#login'||location.hash==='#signup')){
+   $('lerr').textContent=pollarUiState.configMessage;
+  }
+  if(['#home','#profile','#stash','#pay'].includes(location.hash))go();
  }else if(message.type==='solawise:pollar-state'){
   pollarUiState={
+   ...pollarUiState,
    isAuthenticated:message.isAuthenticated===true,
    verified:message.verified===true,
    hasWallet:message.hasWallet===true,
@@ -415,7 +418,7 @@ addEventListener('message',event=>{
   if(pollarUiState.isAuthenticated&&(location.hash==='#login'||location.hash==='#signup')){
    toast(pollarUiState.walletAddress?'Pollar wallet connected':'Signed in; wallet is being prepared');
    location.hash='home';
-  }else if(['#profile','#stash','#pay'].includes(location.hash)){
+  }else if(['#home','#profile','#stash','#pay'].includes(location.hash)){
    go();
   }
  }
@@ -515,6 +518,36 @@ function circle(index){
  const settle=m.querySelector('#settle');if(settle)settle.onclick=()=>{m.remove();programRequest('settle-round',{circle:item.address})};
  const claim=m.querySelector('#claim');if(claim)claim.onclick=()=>{m.remove();programRequest('claim-collateral',{circle:item.address})};
 }
+function newEvent(){
+ if(!programWriteReady())return;
+ const date=new Date();date.setDate(date.getDate()+7);
+ const localDate=new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ const m=modal(`<h3>Create a devnet ticket event</h3><p class="mut">Ticket proceeds stay in escrow until the event ends. Cancellation enables full refunds.</p><label>Event title</label><input id="et" maxlength="64" placeholder="Community workshop"><label>Date and time</label><input id="ed" type="datetime-local" min="${localDate}" value="${localDate}"><label>Ticket price (${tokenUnit()})</label><input id="ep" type="number" min="0.000001" step="any" value="1"><label>Ticket capacity</label><input id="ec" type="number" min="1" max="1000000" step="1" value="50"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Create event</button></div>`);
+ m.querySelector('#ok').onclick=()=>{
+  const title=m.querySelector('#et').value.trim(),eventDate=m.querySelector('#ed').value,ticketPrice=m.querySelector('#ep').value,capacity=m.querySelector('#ec').value;
+  if(!title||!eventDate||!ticketPrice||!capacity)return toast('Enter a title, date, ticket price and capacity.');
+  m.remove();programRequest('create-event',{title,eventDate,ticketPrice,capacity});
+ };
+}
+function ticketEvent(index){
+ const item=programUiState.snapshot?.events?.[index];if(!item)return;
+ const wallet=pollarUiState.walletAddress,now=Math.floor(Date.now()/1000),beforeStart=now<item.eventTs;
+ const organizer=item.organizer===wallet,open=item.status==='open',tickets=(programUiState.snapshot?.tickets||[]).filter(ticket=>ticket.event===item.address),listed=tickets.filter(ticket=>ticket.status==='listed');
+ let actions='';
+ if(open&&beforeStart&&item.soldCount<item.capacity)actions+=`<button class="btn" id="buy">Buy ticket · ${tokenAmount(item.ticketPrice)} ${tokenUnit()}</button>`;
+ if(open&&beforeStart&&organizer)actions+=`<button class="btn o" id="cancel">Cancel event</button>`;
+ if(open&&!beforeStart)actions+=`<button class="btn" id="complete">Mark event complete</button>`;
+ const listings=listed.map(ticket=>`<div class="tx"><i class="in"><span class="ms">confirmation_number</span></i><div>Ticket #${ticket.ticketId}<small>Seller ${escapePollarValue(shortKey(ticket.owner))} · resale cap 10%</small></div><b>${tokenAmount(ticket.askingPrice)} ${tokenUnit()} ${ticket.owner!==wallet?`<button class="chip" data-buy-resale="${escapePollarValue(ticket.address)}">Buy</button>`:''}</b></div>`).join('');
+ const m=modal(`<h3>${escapePollarValue(item.title)}</h3><p class="mut">${new Date(item.eventTs*1000).toLocaleString()} · ${item.soldCount}/${item.capacity} sold · ${tokenAmount(item.ticketPrice)} ${tokenUnit()} · ${item.status}</p><p style="font-size:12px;overflow-wrap:anywhere">Organizer ${escapePollarValue(shortKey(item.organizer))} · ${escapePollarValue(item.address)}</p><div class="rows">${listings||'<p class="mut">No tickets listed for resale.</p>'}</div><div class="row"><button class="btn o" data-x>Close</button>${actions}</div>`);
+ const buy=m.querySelector('#buy');if(buy)buy.onclick=()=>{m.remove();programRequest('buy-ticket',{event:item.address})};
+ const cancel=m.querySelector('#cancel');if(cancel)cancel.onclick=()=>{m.remove();programRequest('cancel-event',{event:item.address})};
+ const complete=m.querySelector('#complete');if(complete)complete.onclick=()=>{m.remove();programRequest('complete-event',{event:item.address})};
+ m.querySelectorAll('[data-buy-resale]').forEach(button=>button.addEventListener('click',()=>{const address=button.getAttribute('data-buy-resale');if(address){m.remove();programRequest('buy-resale',{ticket:address})}}));
+}
+function listTicket(address,facePrice){
+ const m=modal(`<h3>List ticket for resale</h3><p class="mut">Resale price is capped at 110% of its face price (${tokenAmount(facePrice)} ${tokenUnit()}).</p><label>Asking price (${tokenUnit()})</label><input id="ap" type="number" min="0.000001" step="any" value="${tokenAmount(facePrice)}"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">List ticket</button></div>`);
+ m.querySelector('#ok').onclick=()=>{const askingPrice=m.querySelector('#ap').value;if(!askingPrice)return toast('Enter an asking price.');m.remove();programRequest('list-ticket',{ticket:address,askingPrice})};
+}
 async function copyText(value){try{await navigator.clipboard.writeText(value);toast('Circle address copied.')}catch{toast('Could not access the clipboard. Copy the address manually.')}}
 V.home=()=>`<h3 class="s" style="margin-top:0">Your Solana devnet</h3>${pollarWalletPanel()}<div class="grid" style="margin-top:20px"><button class="gc" style="background:var(--gt)" onclick="location.hash='save'"><span class="ms">savings</span><b>${programUiState.snapshot?.goals?.length??'—'} goals</b><em>On-chain goal vaults</em></button><button class="gc" style="background:var(--bt)" onclick="location.hash='save'"><span class="ms">groups</span><b>${programUiState.snapshot?.circles?.length??'—'} ajo circles</b><em>On-chain rotating savings</em></button></div><p class="mut" style="margin-top:16px">${escapePollarValue(programNotice())}</p><button class="chip" onclick="programRequest('refresh')">Refresh on-chain accounts</button>`;
 V.save=()=>{
@@ -525,11 +558,30 @@ V.save=()=>{
 };
 function programWriteReadyMarkup(){const state=programUiState.snapshot;return pollarUiState.isAuthenticated&&pollarUiState.verified&&pollarUiState.walletCustody==='external'&&state?.configured===true&&state?.deployed===true}
 V.invest=()=>`<h3 class="s" style="margin-top:0">Investment opportunities</h3><div class="box"><p class="mut">No live Solana yield provider is connected on devnet. Pollar Earn in the installed SDK is Stellar-only, so SolaWise will not show simulated APY or accept investment deposits.</p></div>`;
-V.events=()=>`<h3 class="s" style="margin-top:0">Ticket escrow</h3><div class="box"><p class="mut">Ticket listings, escrow purchases, resale and refunds are not deployed on devnet. The sample events and QR codes have been removed; no ticket purchase can be made here.</p></div>`;
+V.events=()=>{
+ const state=programUiState.snapshot,events=state?.events||[],tickets=state?.tickets||[],sales=state?.ticketSales||[],wallet=pollarUiState.walletAddress;
+ const eventName=address=>events.find(item=>item.address===address)?.title||'Event';
+ const eventCards=events.map((item,index)=>`<button class="gc" style="background:var(--bt)" onclick="ticketEvent(${index})"><span class="ms">confirmation_number</span><b>${escapePollarValue(item.title)}</b><em>${new Date(item.eventTs*1000).toLocaleString()}</em><em>${item.soldCount}/${item.capacity} sold · ${tokenAmount(item.ticketPrice)} ${tokenUnit()}</em><em>${item.status}</em></button>`).join('');
+ const ticketRows=tickets.filter(ticket=>ticket.owner===wallet).map(ticket=>{
+  const event=eventName(ticket.event),price=ticket.status==='listed'?tokenAmount(ticket.askingPrice)+' '+tokenUnit():'Not listed';
+  const control=ticket.status==='listed'
+   ?`<button class="chip" onclick="programRequest('unlist-ticket',{ticket:'${ticket.address}'})">Remove listing</button>`
+   :`<button class="chip" onclick="listTicket('${ticket.address}','${ticket.facePrice}')">List · max ${tokenAmount((BigInt(ticket.facePrice)*11n/10n).toString())}</button>`;
+  return `<div class="tx"><i class="in"><span class="ms">confirmation_number</span></i><div>${escapePollarValue(event)} · #${ticket.ticketId}<small>${ticket.status==='listed'?'Listed for '+escapePollarValue(price):'Owned by you'}</small></div>${control}</div>`;
+ }).join('');
+ const saleRows=sales.map(sale=>{
+  const item=events.find(event=>event.address===sale.event),isBuyer=sale.buyer===wallet,action=item?.status==='cancelled'&&isBuyer
+   ?`<button class="chip" onclick="programRequest('refund-ticket-sale',{sale:'${sale.address}'})">Claim refund</button>`
+   :item?.status==='completed'&&sale.seller===wallet
+    ?`<button class="chip" onclick="programRequest('settle-ticket-sale',{sale:'${sale.address}'})">Claim payout</button>`:'';
+  return `<div class="tx"><i class="in"><span class="ms">${isBuyer?'shopping_bag':'payments'}</span></i><div>${escapePollarValue(eventName(sale.event))}<small>${isBuyer?'Purchased':'Sold'} · ${tokenAmount(sale.amount)} ${tokenUnit()}</small></div>${action}</div>`;
+ }).join('');
+ return `<p class="mut">${escapePollarValue(programNotice())} Events and ticket sales are stored on Solana devnet; there are no sample listings.</p><div class="chips" style="margin:14px 0"><button class="chip" onclick="programRequest('refresh')">Refresh events</button>${programWriteReadyMarkup()?'<button class="btn" onclick="newEvent()">Create event</button>':''}</div><h3 class="s">Devnet events</h3><div class="grid">${eventCards||'<p class="mut">No on-chain events for this token yet. An organizer can create the first listing.</p>'}</div><h3 class="s">My tickets</h3><div class="rows">${ticketRows||'<p class="mut">No tickets owned or listed by this wallet.</p>'}</div><h3 class="s">Ticket purchases and payouts</h3><div class="rows">${saleRows||'<p class="mut">Your ticket sale history will appear here. Purchases are refundable if the organizer cancels; sellers can claim proceeds after the event.</p>'}</div>`;
+};
 V.pay=()=>`${pollarWalletPanel()}<h3 class="s">Naira ramps and bills</h3><div class="box"><p class="mut">Open Pollar’s live ramp routes. Only routes enabled in Pollar are available; SolaWise does not currently have a verified NGN or Nigerian bill provider.</p><button class="btn" style="margin-top:14px" onclick="pollarAction('ramp')">Open Pollar ramps</button></div><div class="box"><p class="mut">Electricity, airtime, data, cable and cash-out are unavailable here. No simulated bill payment or Naira conversion will be presented as complete.</p></div>`;
 V.stash=()=>pollarWalletPanel();
 V.profile=()=>`<div class="box"><h3 class="s" style="margin-top:0">Pollar account</h3><p class="mut">Wallet: ${pollarUiState.walletAddress?escapePollarValue(pollarUiState.walletAddress):'Not connected'}</p><p class="mut">Signing: ${escapePollarValue(pollarUiState.walletCustody||'Not available')}</p><p class="mut" style="margin-top:12px">${escapePollarValue(programNotice())}</p><a class="btn o" href="#login" style="margin-top:16px">Sign out / switch wallet</a></div>`;
-V.ai=()=>`<div class="chat"><b style="font-size:24px">SolaWise Assistant</b><p class="mut" style="margin:6px 0 16px">AI responses are disabled until a server-side model provider is configured. This app will not present canned responses as live AI advice.</p><p class="mut">You can already review your devnet goal and ajo accounts in Save. Every on-chain action requires wallet approval.</p></div>`;
+V.ai=()=>`<div class="chat"><b style="font-size:24px">SolaWise Assistant</b><p class="mut" style="margin:6px 0 16px">Guidance only; the assistant cannot move funds or replace financial advice. No wallet address or account history is sent with your messages.</p><div class="msgs" id="msgs" aria-live="polite">${S.chat.map(message=>`<div class="bb2 ${message.role==='user'?'u':'a'}">${escapePollarValue(message.content)}</div>`).join('')}${BUSY?'<div class="bb2 a">Thinking…</div>':''}${AI_ERROR?`<div class="bb2 err" role="alert">${escapePollarValue(AI_ERROR)}</div>`:''}</div><div class="cin"><input id="q" maxlength="2000" placeholder="Ask SolaWise…" onkeydown="if(event.key==='Enter')ask()" aria-label="Ask a question"><button class="chip" onclick="mic()" aria-label="Speak your question"><span class="ms">mic</span></button><button class="btn" onclick="ask()" ${BUSY?'disabled':''}>Send</button></div><p class="mut">AI responses use server-side Groq. Provider errors are shown here; no simulated answers are used.</p></div>`;
 addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==parent||!event.data||typeof event.data!=='object')return;
  const message=event.data;

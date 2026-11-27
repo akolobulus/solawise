@@ -49,6 +49,38 @@ export type CircleSnapshot = {
   }>;
 };
 
+export type EventSnapshot = {
+  address: string;
+  organizer: string;
+  title: string;
+  eventTs: number;
+  ticketPrice: string;
+  capacity: number;
+  soldCount: number;
+  nextSaleId: string;
+  status: string;
+};
+
+export type TicketSnapshot = {
+  address: string;
+  event: string;
+  ticketId: number;
+  owner: string;
+  facePrice: string;
+  askingPrice: string;
+  status: string;
+};
+
+export type TicketSaleSnapshot = {
+  address: string;
+  event: string;
+  ticket: string;
+  seller: string;
+  buyer: string;
+  amount: string;
+  saleId: string;
+};
+
 export type ProgramSnapshot = {
   configured: boolean;
   deployed: boolean;
@@ -58,6 +90,9 @@ export type ProgramSnapshot = {
   decimals: number | null;
   goals: GoalSnapshot[];
   circles: CircleSnapshot[];
+  events: EventSnapshot[];
+  tickets: TicketSnapshot[];
+  ticketSales: TicketSaleSnapshot[];
   message: string | null;
 };
 
@@ -75,7 +110,22 @@ export type ProgramAction =
   | { action: "join-circle"; circle: string }
   | { action: "contribute"; circle: string }
   | { action: "settle-round"; circle: string }
-  | { action: "claim-collateral"; circle: string };
+  | { action: "claim-collateral"; circle: string }
+  | {
+      action: "create-event";
+      title: string;
+      eventDate: string;
+      ticketPrice: string;
+      capacity: string;
+    }
+  | { action: "buy-ticket"; event: string }
+  | { action: "list-ticket"; ticket: string; askingPrice: string }
+  | { action: "unlist-ticket"; ticket: string }
+  | { action: "buy-resale"; ticket: string }
+  | { action: "cancel-event"; event: string }
+  | { action: "complete-event"; event: string }
+  | { action: "refund-ticket-sale"; sale: string }
+  | { action: "settle-ticket-sale"; sale: string };
 
 export function parseProgramAction(value: unknown): ProgramAction | null {
   if (!value || typeof value !== "object") return null;
@@ -134,6 +184,44 @@ export function parseProgramAction(value: unknown): ProgramAction | null {
     case "claim-collateral":
       return typeof request.circle === "string"
         ? { action: "claim-collateral", circle: request.circle }
+        : null;
+    case "create-event":
+      return typeof request.title === "string" &&
+        typeof request.eventDate === "string" &&
+        typeof request.ticketPrice === "string" &&
+        typeof request.capacity === "string"
+        ? {
+            action: "create-event",
+            title: request.title,
+            eventDate: request.eventDate,
+            ticketPrice: request.ticketPrice,
+            capacity: request.capacity,
+          }
+        : null;
+    case "buy-ticket":
+    case "cancel-event":
+    case "complete-event":
+      return typeof request.event === "string"
+        ? { action: request.action, event: request.event }
+        : null;
+    case "list-ticket":
+      return typeof request.ticket === "string" &&
+        typeof request.askingPrice === "string"
+        ? {
+            action: "list-ticket",
+            ticket: request.ticket,
+            askingPrice: request.askingPrice,
+          }
+        : null;
+    case "unlist-ticket":
+    case "buy-resale":
+      return typeof request.ticket === "string"
+        ? { action: request.action, ticket: request.ticket }
+        : null;
+    case "refund-ticket-sale":
+    case "settle-ticket-sale":
+      return typeof request.sale === "string"
+        ? { action: request.action, sale: request.sale }
         : null;
     default:
       return null;
@@ -243,6 +331,9 @@ export async function getProgramSnapshot(
     decimals: null,
     goals: [],
     circles: [],
+    events: [],
+    tickets: [],
+    ticketSales: [],
     message: null,
   };
 
@@ -277,9 +368,12 @@ export async function getProgramSnapshot(
       };
     }
 
-    const [goals, allCircles] = await Promise.all([
+    const [goals, allCircles, allEvents, allTickets, allTicketSales] = await Promise.all([
       program.account.goal.all(),
       program.account.circle.all(),
+      program.account.event.all(),
+      program.account.ticket.all(),
+      program.account.ticketSale.all(),
     ]);
     const ownerGoals = goals
       .filter(({ account }) => account.owner.equals(owner))
@@ -317,6 +411,50 @@ export async function getProgramSnapshot(
           defaulted: member.defaulted,
         })),
       }));
+    const events = allEvents
+      .filter(({ account }) => account.mint.equals(mint))
+      .map(({ publicKey, account }) => ({
+        address: publicKey.toBase58(),
+        organizer: account.organizer.toBase58(),
+        title: account.title,
+        eventTs: account.eventTs.toNumber(),
+        ticketPrice: account.ticketPrice.toString(),
+        capacity: account.capacity,
+        soldCount: account.soldCount,
+        nextSaleId: account.nextSaleId.toString(),
+        status: circleStatus(account.status),
+      }));
+    const eventAddresses = new Set(events.map((event) => event.address));
+    const tickets = allTickets
+      .filter(
+        ({ account }) =>
+          eventAddresses.has(account.event.toBase58()) &&
+          (account.owner.equals(owner) || circleStatus(account.status) === "listed"),
+      )
+      .map(({ publicKey, account }) => ({
+        address: publicKey.toBase58(),
+        event: account.event.toBase58(),
+        ticketId: account.ticketId,
+        owner: account.owner.toBase58(),
+        facePrice: account.facePrice.toString(),
+        askingPrice: account.askingPrice.toString(),
+        status: circleStatus(account.status),
+      }));
+    const ticketSales = allTicketSales
+      .filter(
+        ({ account }) =>
+          eventAddresses.has(account.event.toBase58()) &&
+          (account.buyer.equals(owner) || account.seller.equals(owner)),
+      )
+      .map(({ publicKey, account }) => ({
+        address: publicKey.toBase58(),
+        event: account.event.toBase58(),
+        ticket: account.ticket.toBase58(),
+        seller: account.seller.toBase58(),
+        buyer: account.buyer.toBase58(),
+        amount: account.amount.toString(),
+        saleId: account.saleId.toString(),
+      }));
 
     return {
       ...empty,
@@ -326,6 +464,9 @@ export async function getProgramSnapshot(
       decimals: mintInfo.decimals,
       goals: ownerGoals,
       circles: ownerCircles,
+      events,
+      tickets,
+      ticketSales,
       message: null,
     };
   } catch (error) {
@@ -543,6 +684,210 @@ export async function runProgramAction(
           })
           .instruction(),
       );
+      break;
+    }
+    case "create-event": {
+      const title = request.title.trim();
+      const eventDate = new Date(request.eventDate);
+      const capacity = Number(request.capacity);
+      if (!title || new TextEncoder().encode(title).length > 64) {
+        throw new Error("Event title must be between 1 and 64 UTF-8 bytes.");
+      }
+      if (!Number.isFinite(eventDate.getTime()) || eventDate.getTime() <= Date.now()) {
+        throw new Error("Choose an event date and time in the future.");
+      }
+      if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1_000_000) {
+        throw new Error("Event capacity must be between 1 and 1,000,000 tickets.");
+      }
+
+      const id = newId();
+      const [event] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event"), owner.toBuffer(), id.toArrayLike(Buffer, "le", 8)],
+        program.programId,
+      );
+      const [vault] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event_vault"), event.toBuffer()],
+        program.programId,
+      );
+      transaction.add(
+        await program.methods
+          .createEvent(
+            id,
+            title,
+            new BN(Math.floor(eventDate.getTime() / 1_000)),
+            amountToBaseUnits(request.ticketPrice, mintInfo.decimals),
+            capacity,
+          )
+          .accountsPartial({
+            organizer: owner,
+            mint,
+            event,
+            vault,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId,
+          })
+          .instruction(),
+      );
+      break;
+    }
+    case "buy-ticket": {
+      const event = requirePublicKey(request.event, "Event");
+      const eventAccount = await program.account.event.fetch(event);
+      const ticketId = eventAccount.soldCount;
+      const saleId = eventAccount.nextSaleId;
+      const [ticket] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("ticket"),
+          event.toBuffer(),
+          new BN(ticketId).toArrayLike(Buffer, "le", 4),
+        ],
+        program.programId,
+      );
+      const [sale] = PublicKey.findProgramAddressSync(
+        [Buffer.from("ticket_sale"), event.toBuffer(), saleId.toArrayLike(Buffer, "le", 8)],
+        program.programId,
+      );
+      const [vault] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event_vault"), event.toBuffer()],
+        program.programId,
+      );
+      transaction.add(
+        await program.methods
+          .buyTicket(ticketId, saleId)
+          .accountsPartial({
+            buyer: owner,
+            event,
+            ticket,
+            sale,
+            vault,
+            buyerAta: ownerAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId,
+          })
+          .instruction(),
+      );
+      break;
+    }
+    case "list-ticket":
+    case "unlist-ticket": {
+      const ticket = requirePublicKey(request.ticket, "Ticket");
+      const ticketAccount = await program.account.ticket.fetch(ticket);
+      const method =
+        request.action === "list-ticket"
+          ? program.methods.listTicket(
+              amountToBaseUnits(request.askingPrice, mintInfo.decimals),
+            )
+          : program.methods.unlistTicket();
+      transaction.add(
+        await method
+          .accountsPartial({
+            owner,
+            event: ticketAccount.event,
+            ticket,
+          })
+          .instruction(),
+      );
+      break;
+    }
+    case "buy-resale": {
+      const ticket = requirePublicKey(request.ticket, "Ticket");
+      const ticketAccount = await program.account.ticket.fetch(ticket);
+      const event = await program.account.event.fetch(ticketAccount.event);
+      const eventAddress = ticketAccount.event;
+      const saleId = event.nextSaleId;
+      const [sale] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("ticket_sale"),
+          eventAddress.toBuffer(),
+          saleId.toArrayLike(Buffer, "le", 8),
+        ],
+        program.programId,
+      );
+      const [vault] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event_vault"), eventAddress.toBuffer()],
+        program.programId,
+      );
+      transaction.add(
+        await program.methods
+          .buyResale(saleId)
+          .accountsPartial({
+            buyer: owner,
+            event: eventAddress,
+            ticket,
+            sale,
+            vault,
+            buyerAta: ownerAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId,
+          })
+          .instruction(),
+      );
+      break;
+    }
+    case "cancel-event": {
+      const event = requirePublicKey(request.event, "Event");
+      transaction.add(
+        await program.methods
+          .cancelEvent()
+          .accountsPartial({ organizer: owner, event })
+          .instruction(),
+      );
+      break;
+    }
+    case "complete-event": {
+      const event = requirePublicKey(request.event, "Event");
+      transaction.add(
+        await program.methods
+          .completeEvent()
+          .accountsPartial({ caller: owner, event })
+          .instruction(),
+      );
+      break;
+    }
+    case "refund-ticket-sale":
+    case "settle-ticket-sale": {
+      const sale = requirePublicKey(request.sale, "Ticket sale");
+      const saleAccount = await program.account.ticketSale.fetch(sale);
+      const event = saleAccount.event;
+      const [vault] = PublicKey.findProgramAddressSync(
+        [Buffer.from("event_vault"), event.toBuffer()],
+        program.programId,
+      );
+      if (request.action === "refund-ticket-sale") {
+        if (!saleAccount.buyer.equals(owner)) {
+          throw new Error("Only the ticket buyer can claim this cancellation refund.");
+        }
+        transaction.add(
+          await program.methods
+            .refundTicketSale()
+            .accountsPartial({
+              event,
+              sale,
+              vault,
+              buyer: owner,
+              buyerAta: ownerAta,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .instruction(),
+        );
+      } else {
+        if (!saleAccount.seller.equals(owner)) {
+          throw new Error("Only the ticket seller can claim this event payout.");
+        }
+        transaction.add(
+          await program.methods
+            .settleTicketSale()
+            .accountsPartial({
+              event,
+              sale,
+              vault,
+              seller: owner,
+              sellerAta: ownerAta,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .instruction(),
+        );
+      }
       break;
     }
   }
