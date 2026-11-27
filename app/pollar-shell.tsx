@@ -13,6 +13,25 @@ import {
   runProgramAction,
 } from "./anchor-program";
 
+type PollarClientConfig = {
+  apiKey: string;
+  walletAdapters: ReturnType<typeof solanaWalletStandardAdapters>;
+};
+
+const clientConfigs = new Map<string, PollarClientConfig>();
+
+function getClientConfig(apiKey: string): PollarClientConfig {
+  let config = clientConfigs.get(apiKey);
+  if (!config) {
+    config = {
+      apiKey,
+      walletAdapters: solanaWalletStandardAdapters(),
+    };
+    clientConfigs.set(apiKey, config);
+  }
+  return config;
+}
+
 function SolawiseFrame({
   onLoad,
   frameRef,
@@ -430,13 +449,7 @@ function ConfiguredPollarShell({
   onFrameLoad: () => void;
   initialHash: string;
 }) {
-  const client = useMemo(
-    () => ({
-      apiKey,
-      walletAdapters: solanaWalletStandardAdapters(),
-    }),
-    [apiKey],
-  );
+  const client = getClientConfig(apiKey);
 
   return (
     <PollarProvider client={client}>

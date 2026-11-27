@@ -48,8 +48,8 @@ available to the wallets that will use the app.
 npm run dev
 ```
 
-Open `http://localhost:3000`, sign in through Pollar, and choose Phantom or
-another external Solana wallet when prompted. Use devnet assets only.
+Open `http://localhost:3000` and either sign in with a Pollar email code or
+connect Phantom (or another detected Solana wallet). Use devnet assets only.
 
 ## Deploy the Anchor program
 
