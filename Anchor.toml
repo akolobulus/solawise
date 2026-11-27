@@ -7,6 +7,9 @@ skip-lint = false
 [programs.localnet]
 solawise = "7g5t6wDmwmNsgSxTJKqy3gbck2PYRqTsKjXj6PGgq16h"
 
+[programs.devnet]
+solawise = "7g5t6wDmwmNsgSxTJKqy3gbck2PYRqTsKjXj6PGgq16h"
+
 [provider]
 cluster = "localnet"
 wallet = "~/Solawise/.anchor/wallet.json"

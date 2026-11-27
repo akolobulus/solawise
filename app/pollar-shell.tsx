@@ -6,6 +6,11 @@ import {
 } from "@pollar/react";
 import { solanaWalletStandardAdapters } from "@pollar/solana-wallet-standard-adapter";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  getProgramSnapshot,
+  parseProgramAction,
+  runProgramAction,
+} from "./anchor-program";
 
 function SolawiseFrame({
   onLoad,
@@ -37,6 +42,7 @@ function PollarBridge({
     verified,
     hasWallet,
     wallets,
+    getClient,
     walletBalance,
     login,
     logout,
@@ -44,6 +50,7 @@ function PollarBridge({
     openLoginModal,
     openSendModal,
     openReceiveModal,
+    openRampModal,
     openTxHistoryModal,
     openWalletBalanceModal,
     refreshWalletBalance,
@@ -73,6 +80,7 @@ function PollarBridge({
         verified,
         hasWallet,
         walletAddress: solanaWallet?.address ?? null,
+        walletCustody: solanaWallet?.custody ?? null,
         balanceState: walletBalance.step,
         balances,
       },
@@ -85,8 +93,37 @@ function PollarBridge({
     hasWallet,
     isAuthenticated,
     solanaWallet?.address,
+    solanaWallet?.custody,
     verified,
     walletBalance.step,
+  ]);
+
+  useEffect(() => {
+    if (!frameLoaded) return;
+    let active = true;
+    void getProgramSnapshot(
+      isAuthenticated && verified ? getClient() : null,
+      solanaWallet?.address ?? null,
+      solanaWallet?.custody ?? null,
+    ).then((snapshot) => {
+      if (!active) return;
+      frameRef.current?.contentWindow?.postMessage(
+        { type: "solawise:program-state", snapshot },
+        window.location.origin,
+      );
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    frameLoaded,
+    frameRef,
+    getClient,
+    isAuthenticated,
+    solanaWallet?.address,
+    solanaWallet?.custody,
+    verified,
   ]);
 
   useEffect(() => {
@@ -120,6 +157,89 @@ function PollarBridge({
       }
 
       const message = event.data as Record<string, unknown>;
+      if (message.type === "solawise:program-request") {
+        const requestId = message.requestId;
+        if (typeof requestId !== "string") return;
+        const respond = (data: Record<string, unknown>) => {
+          frameRef.current?.contentWindow?.postMessage(
+            { ...data, requestId },
+            window.location.origin,
+          );
+        };
+
+        if (!isAuthenticated || !verified) {
+          openLoginModal();
+          respond({
+            type: "solawise:program-error",
+            message: "Sign in with Pollar before using SolaWise accounts.",
+          });
+          return;
+        }
+
+        if (message.action === "refresh") {
+          void getProgramSnapshot(
+            getClient(),
+            solanaWallet?.address ?? null,
+            solanaWallet?.custody ?? null,
+          )
+            .then((snapshot) =>
+              respond({ type: "solawise:program-state", snapshot }),
+            )
+            .catch((error: unknown) =>
+              respond({
+                type: "solawise:program-error",
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Could not load SolaWise devnet accounts.",
+              }),
+            );
+          return;
+        }
+
+        const request = parseProgramAction(message);
+        if (!request) {
+          respond({
+            type: "solawise:program-error",
+            message: "The SolaWise account action is invalid.",
+          });
+          return;
+        }
+        if (!solanaWallet?.address) {
+          respond({
+            type: "solawise:program-error",
+            message: "Connect a Solana wallet through Pollar first.",
+          });
+          return;
+        }
+
+        void runProgramAction(
+          getClient(),
+          solanaWallet.address,
+          solanaWallet.custody,
+          request,
+        )
+          .then(async (signature) => {
+            respond({ type: "solawise:program-result", signature });
+            const snapshot = await getProgramSnapshot(
+              getClient(),
+              solanaWallet.address,
+              solanaWallet.custody,
+            );
+            respond({ type: "solawise:program-state", snapshot });
+          })
+          .catch((error: unknown) =>
+            respond({
+              type: "solawise:program-error",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "The SolaWise devnet transaction failed.",
+            }),
+          );
+        return;
+      }
+
       if (message.type === "solawise:pollar-logout") {
         logout();
         return;
@@ -149,6 +269,9 @@ function PollarBridge({
               break;
             case "receive":
               openReceiveModal();
+              break;
+            case "ramp":
+              openRampModal();
               break;
             case "balances":
               openWalletBalanceModal();
@@ -211,15 +334,18 @@ function PollarBridge({
   }, [
     createWallet,
     frameRef,
+    getClient,
     isAuthenticated,
     login,
     logout,
     openLoginModal,
     openReceiveModal,
+    openRampModal,
     openSendModal,
     openTxHistoryModal,
     openWalletBalanceModal,
     refreshWalletBalance,
+    solanaWallet,
     verified,
   ]);
 

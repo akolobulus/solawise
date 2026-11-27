@@ -217,9 +217,9 @@ a.av{color:#fff}
 
 <div id="app" class="app hide">
  <aside class="side"><button class="hb" id="dx" aria-label="Close menu"><span class="ms">close</span></button><a class="logo" href="#landing"><svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="#0067F5" stroke-width="3.5"><circle cx="17" cy="17" r="14"/><circle cx="17" cy="17" r="7"/></svg></a>
-  <div class="hi">Hi <b>Ada</b></div><div id="nav"></div><p class="note">Devnet demo. Rates and the ₦/$ conversion are placeholders.</p></aside>
+  <div class="hi">SolaWise <b>Devnet</b></div><div id="nav"></div><p class="note">Solana devnet. Use test tokens only; Anchor actions require an external wallet and devnet SOL.</p></aside>
  <div class="main"><header class="top"><button class="hb" id="abtn" aria-label="Open menu" aria-expanded="false"><span class="ms">menu</span></button><h2 id="ttl"></h2>
-  <div class="r"><span class="pill">Devnet</span><a class="av" href="#profile" aria-label="Profile">A</a></div></header>
+  <div class="r"><span class="pill">Devnet</span><a class="av" href="#profile" aria-label="Profile">S</a></div></header>
   <div class="panel" id="view"></div></div>
  <nav class="mbar" id="mnav"></nav>
 </div>
@@ -255,11 +255,12 @@ function convert(){const m=modal(`<h3>Convert crypto to naira</h3><p class="mut"
 function bill(i){const b=BILLS[i];const m=modal(`<h3>${b.k}</h3><label>Provider</label><select id="p">${b.p.map(x=>"<option>"+x+"</option>").join("")}</select><label>${b.l}</label><input id="n" placeholder="Enter number"><label>Amount (₦)</label><input id="a" type="number" value="${b.k=="Electricity"?5000:1000}"><label>Pay with</label><select id="w"><option value="n">Naira balance (${N(S.bal)})</option><option value="s">Stablecoins ($${S.usd.toFixed(2)})</option></select><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Pay bill</button></div>`);m.querySelector("#ok").onclick=()=>{const a=+m.querySelector("#a").value,n=m.querySelector("#n").value.trim(),w=m.querySelector("#w").value,p=m.querySelector("#p").value;if(!(a>0)||!n)return toast("Enter the number and amount");if(w=="n"){if(!pay(a,b.k+": "+p))return}else{const u=a/FX;if(u>S.usd)return toast("Not enough stablecoins");S.usd-=u;S.tx.unshift({k:"out",t:b.k+": "+p+" (USDC)",d:"Today",a})}m.remove();toast(b.k=="Electricity"?"Paid. Token: "+String(Math.random()).slice(2,18):"Payment successful");go()}}
 S.chat=[];let BUSY=0,DM=0;
 function bub(r,t){const d=document.createElement("div");d.className="bb2 "+r;d.textContent=t;$("msgs").append(d);d.scrollIntoView({block:"nearest"});return d}
-const fb=q=>{q=q.toLowerCase();return q.includes("ajo")?"Ajo is a rotating group savings pot: everyone pays in each round and one person collects. In SolaWise the pot is protected and collateral covers a missed payment, so your geng stays safe.":q.includes("convert")||q.includes("usdc")||q.includes("bill")?"Open Pay, choose Convert to naira, enter your USDC or USDT amount and confirm. Then pay light, data or cable from your naira or straight from stablecoins.":"A simple way to start: divide your target by the months left and lock that amount in a Goal each month, so it is out of reach until your date. Tell me what you are working towards and I will help you plan it."};
+const fb=q=>{q=q.toLowerCase();return q.includes("ajo")?"An ajo circle rotates contributions to members in join order. On SolaWise devnet, the program can hold collateral and cover a missed contribution, but each participant must sign with an external Solana wallet.":q.includes("convert")||q.includes("usdc")||q.includes("bill")?"Pollar only displays payment and ramp routes enabled for this app. Nigerian naira rails and bill providers are not currently connected, so SolaWise cannot claim or simulate a successful payment.":"Set a clear savings target and maturity date, then use a devnet SPL token in an on-chain Goal. Check the token mint and wallet carefully before signing."};
 async function ask(q){q=(q||$("q").value).trim();if(!q||BUSY)return;$("q").value="";S.chat.push({role:"user",content:q});bub("u",q);const out=bub("a","Thinking…");BUSY=1;let t;
 try{const sm=await claude.use("sample");if(!sm)throw 0;
-const ctx="Naira balance "+N(S.bal)+"; stablecoins $"+S.usd.toFixed(2)+"; goals: "+(S.goals.filter(g=>g.t).map(g=>g.n+" "+N(g.s)+" of "+N(g.t)+" by "+g.d).join("; ")||"none yet")+"; ajo circles: "+S.circles.map(c=>c.n+" ("+c.m.length+" members, "+N(c.a)+" per cycle)").join("; ")+"; invested "+N(S.inv);
-const sys="You are SolaWise Assistant, a warm, plain-spoken money guide for Nigerians saving alone or with their geng (ajo = rotating group savings). Be empathetic and concise (under 120 words), use naira, give practical next steps. You can explain goals, ajo, yield, converting stablecoins to naira and paying bills. You never move money and never promise returns; for investing say this is guidance, not financial advice. User data: "+ctx;
+const snapshot=programUiState.snapshot;
+const ctx="Current chain: Solana devnet; wallet: "+(pollarUiState.walletAddress||"not connected")+"; on-chain goal accounts: "+(snapshot?.goals?.length??"unavailable")+"; ajo circles: "+(snapshot?.circles?.length??"unavailable")+"; live Solana yield provider: unavailable; NGN bill payment integration: unavailable.";
+const sys="You are SolaWise Assistant, a warm, plain-spoken guide to savings and rotating ajo circles. Be empathetic and concise (under 120 words). Never claim a payment, bill, Naira conversion, investment, or ticket succeeded. Never promise returns. SolaWise currently uses Solana devnet test tokens; explain that every on-chain transaction requires the user's wallet approval. User data: "+ctx;
 const r=await sm(sys+"\n\nConversation so far:\n"+S.chat.slice(0,-1).slice(-8).map(m=>m.role+": "+m.content).join("\n")+"\n\nuser: "+q,{cache:false,onText:({text})=>{out.textContent=text}});t=r.text}catch(e){t=fb(q)}
 out.textContent=t;S.chat.push({role:"assistant",content:t});BUSY=0}
 async function mic(){try{const d=await claude.use("dictation");if(!d)return toast("Voice input isn’t available here");if(!DM){DM=1;d.onFinal(({text})=>{$("q").value+=text+" "})}await d.start()}catch(e){toast("Voice input isn’t available here")}}
@@ -308,7 +309,7 @@ function drawer(on,w){const d=w=='l'?$('ldr'):document.querySelector('.side');d.
 $('lhb').onclick=()=>drawer(1,'l');$('abtn').onclick=()=>drawer(1,'a');$('dx').onclick=()=>drawer(0,'a');$('ov').onclick=()=>{drawer(0,'l');drawer(0,'a')};
 addEventListener('keydown',e=>{if(e.key=='Escape'){drawer(0,'l');drawer(0,'a')}});
 
-let pollarUiState={isAuthenticated:false,walletAddress:null};
+let pollarUiState={isAuthenticated:false,verified:false,walletAddress:null,walletCustody:null};
 function pollarAction(action){
  if(!pollarUiState.isAuthenticated){location.hash='login';return}
  if(window.parent===window){toast('Pollar payments are available on the SolaWise app page.');return}
@@ -362,6 +363,11 @@ V.home=()=>originalHome().replace(
 );
 const githubButton=document.querySelector('#v-login .sso button:nth-child(2)');
 if(githubButton)githubButton.innerHTML='<span class="g">GH</span>Sign in with GitHub';
+const loginWalletButton=document.createElement('button');
+loginWalletButton.type='button';
+loginWalletButton.textContent='Connect Solana wallet';
+loginWalletButton.addEventListener('click',()=>sso('wallet'));
+document.querySelector('#v-login .sso')?.append(loginWalletButton);
 const passwordField=$('lp')?.closest('.fl');
 if(passwordField){
  passwordField.innerHTML='<p class="mut" style="margin:0">We will send a one-time sign-in code to your email.</p>';
@@ -381,6 +387,11 @@ if(signupButtons){
  githubButton.innerHTML='<span class="g">GH</span>Sign up with GitHub';
  githubButton.addEventListener('click',()=>sso('github'));
  signupButtons.append(githubButton);
+ const walletButton=document.createElement('button');
+ walletButton.type='button';
+ walletButton.textContent='Connect Solana wallet';
+ walletButton.addEventListener('click',()=>sso('wallet'));
+ signupButtons.append(walletButton);
 }
 const originalProfile=V.profile;
 function escapePollarValue(value){
@@ -403,7 +414,9 @@ addEventListener('message',event=>{
  }else if(message.type==='solawise:pollar-state'){
   pollarUiState={
    isAuthenticated:message.isAuthenticated===true,
+   verified:message.verified===true,
    hasWallet:message.hasWallet===true,
+   walletCustody:typeof message.walletCustody==='string'?message.walletCustody:null,
    balanceState:typeof message.balanceState==='string'?message.balanceState:'idle',
    balances:Array.isArray(message.balances)?message.balances:[],
    walletAddress:typeof message.walletAddress==='string'?message.walletAddress:null,
@@ -425,6 +438,122 @@ document.addEventListener('click',event=>{
  }
  pollarUiState={isAuthenticated:false,walletAddress:null};
  location.hash='landing';
+});
+let programUiState={snapshot:null};
+const pendingProgramRequests=new Set();
+function tokenAmount(value){
+ const decimals=programUiState.snapshot?.decimals;
+ if(!Number.isInteger(decimals)||decimals<0||decimals>18)return String(value);
+ const raw=BigInt(value),scale=10n**BigInt(decimals);
+ const whole=(raw/scale).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
+ const fraction=(raw%scale).toString().padStart(decimals,'0').replace(/0+$/,'');
+ return fraction?whole+'.'+fraction:whole;
+}
+function tokenUnit(){return programUiState.snapshot?.mint?`SPL ${escapePollarValue(programUiState.snapshot.mint.slice(0,5))}…`:'devnet SPL token'}
+function shortKey(value){return value.length>14?value.slice(0,6)+'…'+value.slice(-5):value}
+function programWriteReady(){
+ if(!pollarUiState.isAuthenticated){location.hash='login';return false}
+ if(!pollarUiState.verified){toast('Wait for Pollar to verify your sign-in.');return false}
+ if(pollarUiState.walletCustody!=='external'){
+  toast('Anchor actions need an external wallet. Sign out, then use Pollar wallet login with Phantom, Solflare or Backpack.');
+  return false
+ }
+ const state=programUiState.snapshot;
+ if(!state?.configured||!state.deployed){toast(state?.message||'SolaWise devnet is not ready.');return false}
+ return true
+}
+function programRequest(action,payload={}){
+ if(action!=='refresh'&&!programWriteReady())return;
+ if(window.parent===window)return toast('SolaWise program actions require the app page.');
+ const requestId=crypto.randomUUID();
+ pendingProgramRequests.add(requestId);
+ window.parent.postMessage({type:'solawise:program-request',requestId,action,...payload},location.origin);
+ if(action!=='refresh')toast('Approve the devnet transaction in your wallet.');
+}
+function programNotice(){
+ const state=programUiState.snapshot;
+ if(!pollarUiState.isAuthenticated)return 'Sign in with Pollar to load your devnet accounts.';
+ if(!pollarUiState.walletAddress)return 'Create or connect a Solana wallet through Pollar.';
+ if(!state)return 'Loading Solana devnet configuration…';
+ if(state.message)return state.message;
+ if(pollarUiState.walletCustody!=='external')return 'Pollar-managed wallets can use Pollar payment flows, but this SDK only signs custom Anchor instructions with external wallets. Sign out and choose Phantom, Solflare or Backpack through Pollar.';
+ return 'Transactions use devnet SPL tokens and require devnet SOL for network fees.';
+}
+function goalCard(goal,index){
+ const saved=tokenAmount(goal.saved),target=tokenAmount(goal.target),percent=Number(BigInt(goal.saved)*100n/BigInt(goal.target));
+ return `<button class="gc" style="background:var(--gt)" onclick="goal(${index})"><span class="ms" style="font-size:30px">savings</span><b>${escapePollarValue(goal.name)}</b><div class="bar"><i style="width:${Math.min(100,percent)}%"></i></div><em>${saved} / ${target} ${tokenUnit()}</em><em>Unlocks ${new Date(goal.maturityTs*1000).toLocaleDateString()}</em></button>`
+}
+function newGoal(){
+ if(!programWriteReady())return;
+ const date=new Date();date.setDate(date.getDate()+30);
+ const m=modal(`<h3>New on-chain goal</h3><p class="mut">Funds are held in a devnet SPL-token vault until maturity.</p><label>Goal name</label><input id="gn" maxlength="32" placeholder="Rent, school, trip"><label>Target (${tokenUnit()})</label><input id="gt" type="number" min="0.000001" step="any" value="10"><label>Maturity date</label><input id="gd" type="date" min="${new Date().toISOString().slice(0,10)}" value="${date.toISOString().slice(0,10)}"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Create goal</button></div>`);
+ m.querySelector('#ok').onclick=()=>{
+  const name=m.querySelector('#gn').value.trim(),target=m.querySelector('#gt').value,maturityDate=m.querySelector('#gd').value;
+  if(!name||!target||!maturityDate)return toast('Enter a name, target and maturity date.');
+  m.remove();programRequest('create-goal',{name,target,maturityDate});
+ }
+}
+function goal(index){
+ const item=programUiState.snapshot?.goals?.[index];if(!item)return;
+ const m=modal(`<h3>${escapePollarValue(item.name)}</h3><p class="mut">Saved ${tokenAmount(item.saved)} of ${tokenAmount(item.target)} ${tokenUnit()} · matures ${new Date(item.maturityTs*1000).toLocaleDateString()}</p><label>Deposit amount (${tokenUnit()})</label><input id="ga" type="number" min="0.000001" step="any" value="1"><div class="row"><button class="btn o" data-x>Close</button><button class="btn" id="deposit">Deposit</button></div><button class="chip" id="withdraw" style="width:100%;margin-top:12px">Withdraw after maturity</button>`);
+ m.querySelector('#deposit').onclick=()=>{const amount=m.querySelector('#ga').value;if(!amount)return toast('Enter a token amount.');m.remove();programRequest('deposit-goal',{goal:item.address,amount})};
+ m.querySelector('#withdraw').onclick=()=>{m.remove();programRequest('withdraw-goal',{goal:item.address})};
+}
+function newCircle(){
+ if(!programWriteReady())return;
+ const m=modal(`<h3>Create an on-chain ajo</h3><p class="mut">Join order sets the payout order. Size collateral to cover missed contributions.</p><label>Members (2–12)</label><input id="cm" type="number" min="2" max="12" value="3"><label>Contribution per cycle (${tokenUnit()})</label><input id="cc" type="number" min="0.000001" step="any" value="1"><label>Collateral per member (${tokenUnit()})</label><input id="cx" type="number" min="0" step="any" value="2"><label>Cycle duration (days)</label><input id="cd" type="number" min="1" step="1" value="7"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Create circle</button></div>`);
+ m.querySelector('#ok').onclick=()=>{
+  const maxMembers=m.querySelector('#cm').value,contribution=m.querySelector('#cc').value,collateral=m.querySelector('#cx').value,days=Number(m.querySelector('#cd').value);
+  if(!maxMembers||!contribution||!collateral||!Number.isSafeInteger(days)||days<1)return toast('Enter valid circle terms.');
+  m.remove();programRequest('create-circle',{maxMembers,contribution,collateral,cycleSecs:String(days*86400)});
+ }
+}
+function circle(index){
+ const item=programUiState.snapshot?.circles?.[index];if(!item)return;
+ const wallet=pollarUiState.walletAddress,member=item.members.find(person=>person.address===wallet),deadline=item.roundStart+item.cycleSecs,closed=Date.now()/1000>=deadline;
+ const members=item.members.map((person,i)=>`<div><span>${i+1}. ${escapePollarValue(shortKey(person.address))}</span><span class="mut">${person.defaulted?'Defaulted':person.paid?'Paid this round':person.received?'Received a payout':'Joined'} · collateral ${tokenAmount(person.collateral)}</span></div>`).join('');
+ let actions='';
+ if(item.status==='open'&&!member)actions=`<button class="btn" id="join">Join · stake ${tokenAmount(item.collateral)} ${tokenUnit()}</button>`;
+ if(item.status==='active'&&member&&!member.paid&&!closed)actions=`<button class="btn" id="contribute">Contribute ${tokenAmount(item.contribution)} ${tokenUnit()}</button>`;
+ if(item.status==='active'&&closed)actions=`<button class="btn" id="settle">Settle round</button>`;
+ if(item.status==='completed'&&member&&BigInt(member.collateral)>0n)actions=`<button class="btn" id="claim">Claim ${tokenAmount(member.collateral)} ${tokenUnit()} collateral</button>`;
+ const recipient=item.members[item.round];
+ const m=modal(`<h3>${escapePollarValue(item.name)}</h3><p class="mut">${item.joined}/${item.maxMembers} members · round ${Math.min(item.round+1,item.maxMembers)} · ${tokenAmount(item.contribution)} ${tokenUnit()} each cycle · ${item.status}</p><p class="mut">Next recipient: ${recipient?escapePollarValue(shortKey(recipient.address)):'—'} · Circle address</p><p style="font-size:12px;overflow-wrap:anywhere">${escapePollarValue(item.address)} <button class="lk2" onclick="copyText('${item.address}')">Copy</button></p><div class="rows">${members||'<p class="mut">No members yet.</p>'}</div><div class="row"><button class="btn o" data-x>Close</button>${actions}</div>`);
+ const join=m.querySelector('#join');if(join)join.onclick=()=>{m.remove();programRequest('join-circle',{circle:item.address})};
+ const contribute=m.querySelector('#contribute');if(contribute)contribute.onclick=()=>{m.remove();programRequest('contribute',{circle:item.address})};
+ const settle=m.querySelector('#settle');if(settle)settle.onclick=()=>{m.remove();programRequest('settle-round',{circle:item.address})};
+ const claim=m.querySelector('#claim');if(claim)claim.onclick=()=>{m.remove();programRequest('claim-collateral',{circle:item.address})};
+}
+async function copyText(value){try{await navigator.clipboard.writeText(value);toast('Circle address copied.')}catch{toast('Could not access the clipboard. Copy the address manually.')}}
+V.home=()=>`<h3 class="s" style="margin-top:0">Your Solana devnet</h3>${pollarWalletPanel()}<div class="grid" style="margin-top:20px"><button class="gc" style="background:var(--gt)" onclick="location.hash='save'"><span class="ms">savings</span><b>${programUiState.snapshot?.goals?.length??'—'} goals</b><em>On-chain goal vaults</em></button><button class="gc" style="background:var(--bt)" onclick="location.hash='save'"><span class="ms">groups</span><b>${programUiState.snapshot?.circles?.length??'—'} ajo circles</b><em>On-chain rotating savings</em></button></div><p class="mut" style="margin-top:16px">${escapePollarValue(programNotice())}</p><button class="chip" onclick="programRequest('refresh')">Refresh on-chain accounts</button>`;
+V.save=()=>{
+ const state=programUiState.snapshot,goals=state?.goals||[],circles=state?.circles||[];
+ const notice=programNotice();
+ const walletControl=!pollarUiState.isAuthenticated?'<button class="chip" onclick="pollarRequest(&quot;wallet&quot;)">Connect external wallet</button>':pollarUiState.walletCustody!=='external'?'<a class="chip" href="#login">Sign out to switch to an external wallet</a>':'';
+ return `<p class="mut">${escapePollarValue(notice)} ${state?.mint?`Asset mint: ${escapePollarValue(state.mint)}`:''}</p><div class="chips" style="margin:14px 0"><button class="chip" onclick="programRequest('refresh')">Refresh accounts</button>${walletControl}</div><h3 class="s">On-chain goals</h3><div class="grid">${programWriteReadyMarkup()?'<button class="gc add" onclick="newGoal()" aria-label="Create goal">+</button>':''}${goals.map(goalCard).join('')||'<p class="mut">No goal vaults found for this wallet.</p>'}</div><h3 class="s">On-chain ajo circles</h3><div class="grid">${programWriteReadyMarkup()?'<button class="gc add" onclick="newCircle()" aria-label="Create ajo circle">+</button>':''}${circles.map((item,index)=>`<button class="gc" style="background:var(--bt)" onclick="circle(${index})"><span class="ms">groups</span><b>${escapePollarValue(item.name)}</b><em>${item.joined}/${item.maxMembers} members · ${item.status}</em><em>${tokenAmount(item.contribution)} ${tokenUnit()} per cycle</em></button>`).join('')||'<p class="mut">No ajo circles found for this wallet.</p>'}</div>`;
+};
+function programWriteReadyMarkup(){const state=programUiState.snapshot;return pollarUiState.isAuthenticated&&pollarUiState.verified&&pollarUiState.walletCustody==='external'&&state?.configured===true&&state?.deployed===true}
+V.invest=()=>`<h3 class="s" style="margin-top:0">Investment opportunities</h3><div class="box"><p class="mut">No live Solana yield provider is connected on devnet. Pollar Earn in the installed SDK is Stellar-only, so SolaWise will not show simulated APY or accept investment deposits.</p></div>`;
+V.events=()=>`<h3 class="s" style="margin-top:0">Ticket escrow</h3><div class="box"><p class="mut">Ticket listings, escrow purchases, resale and refunds are not deployed on devnet. The sample events and QR codes have been removed; no ticket purchase can be made here.</p></div>`;
+V.pay=()=>`${pollarWalletPanel()}<h3 class="s">Naira ramps and bills</h3><div class="box"><p class="mut">Open Pollar’s live ramp routes. Only routes enabled in Pollar are available; SolaWise does not currently have a verified NGN or Nigerian bill provider.</p><button class="btn" style="margin-top:14px" onclick="pollarAction('ramp')">Open Pollar ramps</button></div><div class="box"><p class="mut">Electricity, airtime, data, cable and cash-out are unavailable here. No simulated bill payment or Naira conversion will be presented as complete.</p></div>`;
+V.stash=()=>pollarWalletPanel();
+V.profile=()=>`<div class="box"><h3 class="s" style="margin-top:0">Pollar account</h3><p class="mut">Wallet: ${pollarUiState.walletAddress?escapePollarValue(pollarUiState.walletAddress):'Not connected'}</p><p class="mut">Signing: ${escapePollarValue(pollarUiState.walletCustody||'Not available')}</p><p class="mut" style="margin-top:12px">${escapePollarValue(programNotice())}</p><a class="btn o" href="#login" style="margin-top:16px">Sign out / switch wallet</a></div>`;
+V.ai=()=>`<div class="chat"><b style="font-size:24px">SolaWise Assistant</b><p class="mut" style="margin:6px 0 16px">Get guidance on goals and ajo. I cannot move funds. Naira rails, bills, investing and ticket escrow are not enabled unless a live provider appears.</p><div class="chips">${["How do on-chain goals work?","How does ajo collateral work?","Are Nigerian bill payments live?"].map(x=>`<button class="chip" onclick="ask(this.textContent)">${x}</button>`).join("")}</div><div id="msgs" class="msgs"></div><div class="cin"><input id="q" placeholder="Ask a question…" onkeydown="if(event.key==='Enter')ask()" aria-label="Ask a question"><button class="btn" onclick="ask()">Send</button></div></div>`;
+addEventListener('message',event=>{
+ if(event.origin!==location.origin||event.source!==parent||!event.data||typeof event.data!=='object')return;
+ const message=event.data;
+ if(message.type==='solawise:program-state'){
+  programUiState.snapshot=message.snapshot&&typeof message.snapshot==='object'?message.snapshot:null;
+  if(typeof message.requestId==='string')pendingProgramRequests.delete(message.requestId);
+  if(['#home','#save','#invest','#pay','#events','#stash','#profile'].includes(location.hash))go();
+ }else if(message.type==='solawise:program-result'){
+  if(typeof message.requestId==='string')pendingProgramRequests.delete(message.requestId);
+  const signature=typeof message.signature==='string'?message.signature:'';
+  toast(signature?'Devnet transaction confirmed: '+shortKey(signature):'Devnet transaction confirmed.');
+ }else if(message.type==='solawise:program-error'){
+  if(typeof message.requestId==='string')pendingProgramRequests.delete(message.requestId);
+  toast(typeof message.message==='string'?message.message:'The devnet transaction failed.');
+ }
 });
 go();
 </script></body></html>
