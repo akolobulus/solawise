@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SolaWise: Your wealth platform on Solana</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded&display=block" rel="stylesheet">
+<style>
+:root{--blue:#0067F5;--navy:#0A2E65;--bg:#F5F6FA;--card:#fff;--ink:#0A2E65;--mut:#6b7a95;--line:#e6e9f2;--bt:#E1F6FF;--gt:#ECFBEC;--rt:#FFF0F4;--at:#F4F4ED;--yt:#FFFFEE;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1428;--card:#121d38;--ink:#e8f0ff;--mut:#93a3c4;--line:#22305a;--bt:#10304f;--gt:#12301f;--rt:#3a1a28;--at:#2a2a22;--yt:#33321a}}
+:root[data-theme="dark"]{--bg:#0b1428;--card:#121d38;--ink:#e8f0ff;--mut:#93a3c4;--line:#22305a;--bt:#10304f;--gt:#12301f;--rt:#3a1a28;--at:#2a2a22;--yt:#33321a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;margin:0}
+body{font-family:Outfit,system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.45}
+button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+a{color:inherit;text-decoration:none}
+.btn{background:var(--blue);color:#fff;padding:12px 22px;border-radius:999px;font-weight:600;display:inline-block}
+.btn.o{background:transparent;color:var(--blue);border:2px solid var(--blue)}
+.hide{display:none!important}
+/* landing */
+html{scroll-behavior:smooth}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:22px}
+.btn{transition:transform .2s,box-shadow .2s}.btn:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(0,103,245,.3)}
+.W{max-width:1040px;margin:0 auto;padding:0 24px}
+.nv{display:flex;align-items:center;gap:32px;height:68px}
+.nv .lk{display:flex;gap:26px;font-size:14px;color:var(--mut)}
+.nv .lk a{position:relative;padding:4px 0;transition:color .2s}.nv .lk a:hover{color:var(--blue)}
+.nv .lk a:after{content:"";position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--blue);transform:scaleX(0);transform-origin:left;transition:transform .25s}.nv .lk a:hover:after{transform:scaleX(1)}
+.nv .rt{margin-left:auto;display:flex;gap:22px;align-items:center;font-size:14px;font-weight:600;color:var(--blue)}
+.nv .btn{padding:10px 18px;font-size:14px;border-radius:8px;color:#fff}
+@keyframes up{from{opacity:0;transform:translateY(26px)}}@keyframes bob{50%{transform:translateY(-14px)}}@keyframes mq{to{transform:translateX(-50%)}}
+.hero{position:relative;overflow:hidden;min-height:680px;display:grid;place-items:center;text-align:center;background:var(--bg) repeating-linear-gradient(90deg,transparent 0 11px,rgba(10,46,101,.05) 11px 12px)}
+.hero h1{font-size:clamp(44px,7.4vw,84px);font-weight:300;line-height:1;letter-spacing:-.045em}
+.hero h1 span{display:block;animation:up .9s both}.hero h1 span+span{animation-delay:.18s;font-weight:500}
+.hero p{color:var(--mut);max-width:40ch;margin:24px auto 28px;font-size:17px;animation:up .9s .36s both}
+.hero .btn{animation:up .9s .5s both}.hero .btn:hover{animation:none}
+.hero .btn,.sh .btn{border-radius:8px;padding:12px 22px;font-size:14px}
+.st{position:absolute;bottom:-30px;width:min(36vw,430px);height:auto}.st.l{left:-30px}.st.r{right:-30px;transform:scaleX(-1)}
+.bb{transform-box:fill-box;animation:bob 4.5s ease-in-out infinite}.bb+.bb{animation-delay:1.4s}
+.sec{padding:100px 0;border-top:1px solid var(--line)}
+.sh{display:grid;grid-template-columns:1.15fr 1fr auto;gap:32px;align-items:start}
+.sh h2,.bl h2{font-size:clamp(36px,5.4vw,58px);font-weight:300;line-height:1.02;letter-spacing:-.04em}
+.sh h2 b,.bl h2 b{font-weight:600}
+.sh p,.bl p{color:var(--mut);font-size:15px;max-width:38ch}
+.c3g{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:56px}
+.cd{background:var(--bg);border-radius:24px;min-height:410px;position:relative;overflow:hidden;padding:22px;transition:transform .3s,box-shadow .3s,opacity .7s}
+.cd h4{font-size:16px;font-weight:600}.cd svg{position:absolute;left:10%;top:70px;width:80%;transition:transform .5s}
+.cd.in:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(10,46,101,.12)}.cd:hover svg{transform:scale(1.07) rotate(-2deg)}
+.cd .in2{position:absolute;left:12px;right:12px;bottom:12px;background:var(--card);border-radius:16px;padding:16px;font-size:13px;color:var(--mut);line-height:1.4}
+.cd .in2 b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
+.rv{opacity:0;transform:translateY(24px);transition:opacity .7s,transform .7s}.rv.in{opacity:1;transform:none}
+.bl{background:var(--blue);color:#fff;padding:100px 0 76px}.bl p{color:rgba(255,255,255,.78)}
+.bl .btn{background:#fff;color:var(--blue)}
+.calc{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:16px;margin-top:48px}
+.c1,.c3{background:rgba(255,255,255,.1);border-radius:20px;padding:26px;min-height:230px;font-size:20px;line-height:1.25;font-weight:500;display:flex;flex-direction:column;gap:14px;transition:background .3s,transform .3s}
+.c1:hover,.c3:hover{background:rgba(255,255,255,.18);transform:translateY(-4px)}
+.c1 small,.c3 small,.c2 small{font-size:13px;font-weight:400;opacity:.8}
+.c2{background:#d3fbe4;color:#0a7a3a;border-radius:20px;padding:26px;font-size:22px;line-height:1.2;font-weight:500;display:flex;flex-direction:column;gap:14px;transition:transform .3s}.c2:hover{transform:translateY(-4px)}
+.c2 code{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:rgba(10,122,58,.12);border-radius:8px;padding:8px 10px;line-height:1.7}
+.dot{font-size:12px;margin-top:20px;color:rgba(255,255,255,.85)}
+.qw{overflow:hidden;padding:44px 0 10px}.mq{display:flex;gap:16px;width:max-content;animation:mq 34s linear infinite}.qw:hover .mq{animation-play-state:paused}
+.mq div{flex:none;width:250px;height:150px;border:1px solid var(--line);border-radius:22px;padding:18px;color:var(--blue);font-size:25px;font-weight:700;line-height:1.1;background:var(--card);transition:transform .25s,border-color .25s}
+.mq div:hover{transform:translateY(-6px);border-color:var(--blue)}.mq span{display:block;font-size:34px;font-style:italic;line-height:.9}
+.cta{text-align:center;padding:110px 0 130px}.cta p{font-size:clamp(30px,5vw,48px);color:#7d92b8;font-weight:300}
+.cta a{font-size:clamp(34px,5.4vw,54px);color:var(--blue);display:inline-block;font-weight:400}.cta a i{display:inline-block;font-style:normal;transition:transform .3s}.cta a:hover i{transform:translateX(12px)}
+.leg{text-align:center;font-size:12px;color:var(--mut);padding:0 24px 96px}
+.ck{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);padding:12px 24px;display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--mut);z-index:15}
+.ck button{color:var(--blue);font-weight:600}
+@media(max-width:860px){.sh,.c3g,.calc{grid-template-columns:1fr}.nv .lk{display:none}.st{opacity:.5;width:60vw}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}.rv{opacity:1;transform:none}}
+/* app */
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.side{padding:24px 16px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.side .hi{font-size:24px;color:var(--mut);margin:18px 12px 14px}.side .hi b{color:var(--navy);color:var(--ink)}
+.nav{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:12px;color:var(--mut);font-weight:500;width:100%;text-align:left}
+.nav.on{background:var(--bt);color:var(--blue)}.nav svg{width:20px;height:20px;fill:currentColor}
+.side .note{margin-top:auto;font-size:13px;color:var(--mut);padding:0 12px}
+.main{min-width:0}
+.top{display:flex;justify-content:space-between;align-items:center;padding:18px 28px}
+.top h2{font-size:14px;letter-spacing:.14em;font-weight:600;text-transform:uppercase;flex:1;text-align:center}
+.top .r{display:flex;gap:14px;align-items:center}
+.pill{background:var(--rt);color:#c0224b;padding:6px 12px;border-radius:999px;font-weight:600;font-size:14px}
+.av{width:38px;height:38px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:700}
+.panel{background:var(--card);border-radius:28px 0 0 0;padding:32px;min-height:calc(100vh - 74px)}
+.two{display:grid;grid-template-columns:1.15fr .85fr;gap:32px}
+.tabs{display:inline-flex;background:var(--bg);border-radius:999px;padding:6px;margin-bottom:24px}
+.tabs button{padding:10px 22px;border-radius:999px;font-weight:600;color:var(--mut)}.tabs .on{background:var(--card);color:var(--ink)}
+.bal{background:var(--blue);color:#fff;border-radius:24px;padding:28px;min-height:220px;position:relative;overflow:hidden;box-shadow:0 18px 40px rgba(0,103,245,.25)}
+.bal .t{display:flex;justify-content:space-between;opacity:.9;font-size:15px}
+.bal .n{font-size:38px;font-weight:700;margin-top:14px;position:relative}
+.bal svg{position:absolute;left:0;bottom:0;width:100%;height:110px}
+.bal .tag{position:absolute;left:24px;bottom:18px;background:rgba(10,46,101,.45);padding:6px 12px;border-radius:999px;font-size:13px}
+h3.s{font-size:20px;margin:28px 0 14px}
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip{background:var(--bg);padding:12px 20px;border-radius:999px;font-weight:600}
+.chip:hover{background:var(--bt)}
+.box{background:var(--bg);border-radius:20px;padding:20px;margin-top:24px}
+.act{display:flex;gap:14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:12px;width:100%;text-align:left}
+.act i{width:44px;height:44px;border-radius:50%;background:#a437b8;flex:none}
+.act small,.mut{color:var(--mut)}
+.promo{background:linear-gradient(135deg,var(--navy),#143f8a);color:#fff;border-radius:20px;padding:26px;margin-top:22px}
+.promo h4{font-size:22px;margin-bottom:10px}
+.promo button{background:#FFD84D;color:var(--navy);font-weight:700;padding:8px 14px;border-radius:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+.gc{border-radius:20px;padding:22px;min-height:136px;text-align:left;display:flex;flex-direction:column;gap:6px;justify-content:center;position:relative;border:1px solid transparent}
+.gc:hover{border-color:var(--blue)}
+.gc.add{background:var(--card);border:1px solid var(--line);align-items:center;font-size:34px;color:var(--blue)}
+.gc b{font-size:19px}.gc em{font-style:normal;font-size:13px;font-weight:600;color:var(--mut)}
+.bar{height:6px;background:rgba(10,46,101,.12);border-radius:9px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--blue)}
+.tx{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+.tx i{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:700;flex:none}
+.tx .in{background:var(--gt);color:#1c8a3a}.tx .out{background:var(--bt);color:var(--blue)}.tx div{flex:1}.tx small{display:block;color:var(--mut)}
+.ev{border-radius:20px;overflow:hidden;background:var(--bg)}
+.ev .im{height:110px;display:grid;place-items:center;font-size:44px}.ev .bd{padding:16px}
+.tk{display:flex;gap:16px;align-items:center;background:var(--bt);border-radius:20px;padding:16px;margin-top:12px}
+.qr{display:grid;grid-template-columns:repeat(9,6px);gap:1px;padding:6px;background:#fff;border-radius:8px}.qr i{width:6px;height:6px;background:#fff}.qr i.k{background:#0A2E65}
+.rows>div{display:flex;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--line)}
+.rows b{display:block}
+.mask{position:fixed;inset:0;background:rgba(10,46,101,.55);display:grid;place-items:center;padding:20px;z-index:20}
+.dlg{background:var(--card);border-radius:24px;padding:26px;width:min(440px,100%);max-height:90vh;overflow:auto}
+.dlg h3{font-size:22px;margin-bottom:14px}
+label{display:block;font-size:14px;color:var(--mut);margin:12px 0 4px}
+input,select{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+.dlg .row{display:flex;gap:10px;margin-top:20px}.dlg .row .btn{flex:1;text-align:center}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 20px;border-radius:999px;z-index:30;font-weight:500}
+.mbar{display:none}
+@media(max-width:860px){
+.hero,.two{grid-template-columns:1fr}.app{grid-template-columns:1fr}.side{display:none}
+.panel{border-radius:24px 24px 0 0;padding:20px 16px 96px}.top{padding:14px 16px}
+.mbar{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);padding:8px 4px calc(8px + env(safe-area-inset-bottom,0px));z-index:10}
+.mbar .nav{flex-direction:column;gap:2px;font-size:12px;padding:6px;justify-content:center;align-items:center}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+@media(max-width:860px){body{overflow-x:hidden}.hero{min-height:560px}.hero p{font-size:16px}.sh .btn{justify-self:start}.sec{padding:64px 0}.bl{padding:64px 0 48px}.cd{min-height:380px}.nv{gap:12px}.nv .rt{gap:12px}.nv .btn{padding:9px 14px}.ck{flex-direction:column;align-items:flex-start}.cta{padding:72px 0 150px}.mq div{width:220px}.grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.panel{padding:18px 14px 100px}.two{gap:20px}.bal .n{font-size:32px}.top{padding:12px 14px}.top h2{font-size:12px}.top .pill{display:none}.mbar .nav[href="#profile"]{display:none}.mbar .nav{flex:1;min-width:0;font-size:11px}.mbar .nav svg{width:22px;height:22px}.mask{align-items:end;padding:0}.dlg{border-radius:24px 24px 0 0;width:100%}.toast{bottom:90px;max-width:90vw;text-align:center}.tk{flex-direction:column;align-items:flex-start}.rows>div{gap:12px}}
+@media(max-width:480px){.nv .rt a:first-child{display:none}.hero h1{font-size:42px}.st{width:70vw;opacity:.35}.sh h2,.bl h2{font-size:34px}}
+a.av{color:#fff}
+/* mobile polish */
+.cd{display:flex;flex-direction:column;min-height:0}
+.cd svg{position:static;width:76%;max-width:260px;margin:16px auto 22px}
+.cd .in2{position:static;margin-top:auto}
+.chip,#mode{min-height:44px}#mode{min-width:44px}
+.tx b{white-space:nowrap}.dlg{padding-bottom:calc(26px + env(safe-area-inset-bottom,0px))}
+@media(min-width:600px) and (max-width:860px){.c3g{grid-template-columns:repeat(2,1fr)}.calc{grid-template-columns:1fr 1fr}.c2{grid-column:1/-1}}
+@media(max-width:860px){html,body{max-width:100vw;overflow-x:hidden}.evg{grid-template-columns:1fr!important}.mbar{overflow:hidden}.mbar .nav{min-height:50px}.side{display:none}.main{width:100%}.bal{padding:22px;min-height:200px}.bal .tag{left:18px}.act{padding:14px}.promo{padding:20px}.promo h4{font-size:19px}.gc{padding:18px;min-height:120px}.gc b{font-size:17px;overflow-wrap:anywhere}.tabs button{padding:10px 18px}.chips{gap:8px}.chip{padding:10px 16px}.dlg{max-height:88vh}.dlg h3{font-size:20px}.c1,.c3,.c2{min-height:0;padding:22px;font-size:18px}.hero{padding-bottom:40px}.cta a{font-size:30px}}
+@media(max-width:480px){.W{padding:0 18px}.nv{height:60px}.logo{font-size:19px}.hero{min-height:540px}.hero h1{font-size:40px;line-height:1.04}.hero p{margin:18px auto 22px}.st{width:56vw;bottom:-50px;opacity:.28}.hero>svg:nth-of-type(3){display:none}.sec{padding:52px 0}.sh{gap:20px}.c3g{margin-top:32px;gap:14px}.cd{padding:18px}.calc{margin-top:28px}.cta p{font-size:26px}.top h2{font-size:11px;letter-spacing:.1em}.panel{padding:16px 12px 100px}.grid{gap:12px}.two b[style*="30px"]{font-size:26px!important}.ev .im{height:90px}.mbar .nav{font-size:10px;padding:6px 2px}}
+@media(max-width:360px){.hero h1{font-size:34px}.nv .btn{padding:8px 12px;font-size:13px}.grid{grid-template-columns:1fr}}
+/* drawer + ai */
+.hb{display:none;width:44px;height:44px;border-radius:12px;font-size:22px;place-items:center;color:var(--ink)}.hb:hover{background:var(--bt)}
+.ov{position:fixed;inset:0;background:rgba(10,46,101,.5);opacity:0;pointer-events:none;transition:opacity .3s;z-index:35}.ov.on{opacity:1;pointer-events:auto}
+.ldr{position:fixed;top:0;right:0;bottom:0;width:min(300px,84vw);background:var(--card);z-index:40;transform:translateX(100%);visibility:hidden;transition:transform .3s,visibility .3s;display:flex;flex-direction:column;gap:4px;padding:calc(16px + env(safe-area-inset-top,0px)) 16px 20px}.ldr.on{transform:none;visibility:visible}
+.ldr a{padding:14px 12px;border-radius:12px;font-weight:500}.ldr a:not(.btn):hover{background:var(--bt);color:var(--blue)}
+.chat{max-width:720px}.msgs{display:flex;flex-direction:column;gap:10px;margin:18px 0;min-height:120px}
+.bb2{max-width:88%;padding:12px 16px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45}
+.bb2.u{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px}.bb2.a{align-self:flex-start;background:var(--bt);border-bottom-left-radius:4px}
+.cin{display:flex;gap:8px;align-items:center;position:sticky;bottom:0;background:var(--card);padding:10px 0}.cin input{flex:1;min-width:0}
+@media(max-width:860px){.hb{display:grid}.nv .rt a:first-child{display:none}.nv .rt{gap:8px}
+.side{display:flex!important;position:fixed!important;left:0;top:0;bottom:0;height:auto!important;width:min(300px,84vw);background:var(--card);z-index:40;transform:translateX(-102%);visibility:hidden;transition:transform .3s,visibility .3s;overflow-y:auto;padding-top:calc(16px + env(safe-area-inset-top,0px))}
+.side.open{transform:none;visibility:visible;box-shadow:0 0 40px rgba(0,0,0,.25)}#dx{align-self:flex-end}.mbar{display:none!important}.panel{padding-bottom:32px!important}.top{gap:6px}.toast{bottom:24px}}
+@media(max-width:860px){.nv .rt>.btn{display:none}}
+.hd{position:fixed;top:0;left:0;right:0;z-index:30;padding-top:env(safe-area-inset-top,0px);background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+#landing{padding-top:68px}html{scroll-padding-top:84px}
+@media(max-width:480px){#landing{padding-top:60px}html{scroll-padding-top:76px}}
+.ms{font-family:"Material Symbols Rounded";font-weight:400;font-style:normal;font-size:24px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;font-feature-settings:"liga";-webkit-font-feature-settings:"liga";vertical-align:middle;user-select:none}
+.nav .ms{font-size:22px}.mbar .nav .ms{font-size:22px}.hb .ms{font-size:26px}.gc .ms,.gc em{display:block}
+.seg{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}.seg button{display:flex;align-items:center;gap:8px;padding:12px 18px;border-radius:14px;background:var(--bg);font-weight:600;border:2px solid transparent}.seg .on{border-color:var(--blue);color:var(--blue);background:var(--bt)}
+.tx i .ms{display:block}.chip .ms{font-size:20px}
+.au{min-height:100vh;background:var(--bg);overflow:hidden}
+.ag{display:grid;grid-template-columns:1fr 1.1fr;gap:48px;align-items:center;padding-top:72px;padding-bottom:48px}
+.ag h1,.ac h1{font-size:clamp(34px,4.6vw,54px);font-weight:700;letter-spacing:-.03em;line-height:1.06}
+.ag h2{font-size:clamp(22px,3vw,30px);color:#a9b6cf;font-weight:600;margin:14px 0}
+.ac{background:var(--card);border-radius:20px;padding:40px;box-shadow:0 12px 40px rgba(10,46,101,.08);display:block}
+.sso{display:flex;gap:12px}.sso button{flex:1;display:flex;gap:10px;justify-content:center;align-items:center;border:1px solid var(--line);border-radius:6px;padding:14px;font-weight:600;background:var(--card);transition:border-color .2s,background .2s,transform .2s}.sso button:hover{border-color:var(--blue);background:var(--bt);transform:translateY(-1px)}
+.g{font-weight:700;font-size:20px;background:conic-gradient(from -45deg,#ea4335 0 25%,#fbbc05 0 50%,#34a853 0 75%,#4285f4 0);-webkit-background-clip:text;background-clip:text;color:transparent}
+.or{display:flex;align-items:center;gap:14px;color:var(--mut);font-size:13px;margin:22px 0}.or:before,.or:after{content:"";flex:1;height:1px;background:var(--line)}
+.fl{position:relative;margin-bottom:18px}.fl label{position:absolute;left:14px;top:8px;margin:0;font-size:11px;color:var(--mut)}
+.fl input{height:58px;padding:24px 46px 6px 14px;border-radius:6px;background:var(--card);border:1px solid var(--line);font-size:16px}.fl input:focus{border-color:var(--blue);outline:0;box-shadow:0 0 0 3px rgba(0,103,245,.18)}
+.eye{position:absolute;right:6px;top:8px;width:42px;height:42px;color:var(--mut)}
+.er{color:#c0224b;font-size:13px;min-height:18px;margin:-6px 0 8px}
+.go{width:100%;padding:16px;border-radius:6px;background:var(--blue);color:#fff;font-weight:600;transition:transform .2s,box-shadow .2s}.go:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(0,103,245,.3)}
+.lk2{color:var(--blue);font-weight:600;font-size:14px}.lk2:hover{text-decoration:underline}
+.af{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin-top:18px}
+.ag2{display:grid;grid-template-columns:1.2fr 1fr;gap:56px;padding-top:56px;padding-bottom:48px;align-items:start}
+.side2{position:relative;min-height:520px}.side2 h3{font-size:26px;font-weight:600;margin-top:34px}.side2 p{max-width:34ch;margin:12px 0 18px}
+.pill2{display:inline-flex;align-items:center;gap:6px;background:var(--card);color:var(--blue);font-weight:600;font-size:14px;padding:9px 16px;border-radius:999px;transition:transform .2s}.pill2:hover{transform:translateX(4px)}.pill2 .ms{font-size:18px;color:#f7c948}
+.side2 svg{position:absolute;right:-60px;bottom:-250px;width:420px;opacity:.5;pointer-events:none}
+@media(max-width:860px){.ag,.ag2{grid-template-columns:1fr;gap:24px;padding-top:28px}.ac{padding:24px 20px}.sso{flex-direction:column}.side2{display:none}}
+</style></head><body>
+
+<div id="landing">
+<aside class="ldr" id="ldr" aria-label="Menu"><button class="hb" style="align-self:flex-end;display:grid" onclick="drawer(0,'l')" aria-label="Close menu"><span class="ms">close</span></button><a href="#problem" onclick="drawer(0,'l')">Why SolaWise</a><a href="#solution" onclick="drawer(0,'l')">How we help</a><a href="#bills" onclick="drawer(0,'l')">Pollar payments</a><a href="#use-cases" onclick="drawer(0,'l')">Your goals</a><a href="#login" onclick="drawer(0,'l')">Log in</a><a class="btn" href="#signup" style="text-align:center;margin-top:12px">Sign up for free</a></aside>
+<header class="hd"><div class="W nv"><a class="logo" href="#landing"><svg width="32" height="32" viewBox="0 0 34 34" fill="none" stroke="#0067F5" stroke-width="3.5"><circle cx="17" cy="17" r="14"/><circle cx="17" cy="17" r="7"/><circle cx="17" cy="17" r="1.5" fill="#0067F5"/></svg>SolaWise</a><div class="lk"><a href="#problem">Why SolaWise</a><a href="#solution">How we help</a><a href="#bills">Pollar payments</a><a href="#use-cases">Your goals</a></div><div class="rt"><a href="#login">Log in</a><a class="btn" href="#signup">Sign up for free</a><button class="hb" id="lhb" aria-label="Open menu" aria-expanded="false"><span class="ms">menu</span></button></div></div></header>
+<section class="hero"><svg class="st l" id="sl" viewBox="0 0 420 520"></svg><svg class="st r" id="sr" viewBox="0 0 420 520"></svg>
+<svg style="position:absolute;left:50%;bottom:36px;transform:translateX(-50%);width:270px;opacity:.75" viewBox="0 0 260 120"><polygon points="20,70 110,40 160,60 70,90" fill="#fff0b8"/><polygon points="120,100 200,70 240,90 160,120" fill="#ffd1dc"/><polygon points="90,60 150,40 190,55 130,78" fill="#ffe3c2"/></svg>
+<div style="position:relative;padding:0 24px"><h1><span>Grow your money.</span><span>Alone or with your geng.</span></h1><p>Plan personal savings, explore ajo with your people, and send or receive Solana assets with Pollar. Nigerian naira ramps and bill payments are not connected in this demo.</p><a class="btn" href="#signup">Start building wealth</a></div></section>
+<section class="sec" id="problem"><div class="W"><div class="sh rv"><h2><b>The problem.</b> Money feels heavy when you carry it alone.</h2><p>Good wealth tools are built for the few. Saving with friends through ajo depends on one person staying honest. And your crypto sits unused because you can’t spend it on everyday Nigerian bills.</p><a class="btn" href="#solution">See how we help</a></div><div class="c3g"><div class="cd rv"><h4>Alone →</h4><svg viewBox="0 0 200 170"><circle cx="100" cy="90" r="58" fill="#ffe6ea"/><text x="100" y="116" text-anchor="middle" font-size="76" font-weight="700" fill="#e0405f">?</text></svg><div class="in2"><b>Saving alone is hard</b>Nobody holds you to the goal, so the money gets spent long before the date you set.</div></div><div class="cd rv"><h4>With others →</h4><svg viewBox="0 0 200 170"><circle cx="100" cy="88" r="56" fill="none" stroke="#f4b3bf" stroke-width="18" stroke-dasharray="250 100"/><path d="M92 80l16 16m0-16L92 96" stroke="#e0405f" stroke-width="6"/></svg><div class="in2"><b>Group savings rely on trust</b>In an ajo, one person holds the pot. One missed payment or one dishonest organiser can break it for everyone.</div></div><div class="cd rv"><h4>Your crypto →</h4><svg viewBox="0 0 200 170"><circle cx="100" cy="90" r="56" fill="#ffe9b8"/><text x="100" y="114" text-anchor="middle" font-size="66" font-weight="700" fill="#b97b00">$</text></svg><div class="in2"><b>Stablecoins are hard to spend</b>Turning crypto into naira for light, data or cable means slow, risky middlemen.</div></div></div></div></section>
+<section class="sec" id="solution"><div class="W"><div class="sh rv"><h2><b>The solution.</b> One home for all your money.</h2><p>Plan personal savings, explore group savings with your geng, and use Pollar for Solana payments. Naira ramps and bill payments are not connected in this demo.</p><a class="btn" href="#home">Open the app</a></div><div class="c3g"><div class="cd rv"><h4>Save by yourself →</h4><svg viewBox="0 0 200 170"><circle cx="100" cy="92" r="62" fill="#cdf5e4"/><rect x="60" y="82" width="80" height="62" rx="12" fill="#1f8a5b"/><path d="M80 82V70a20 20 0 0140 0v12" stroke="#1f8a5b" stroke-width="9" fill="none"/><circle cx="100" cy="112" r="8" fill="#cdf5e4"/></svg><div class="in2"><b>Goals that wait for you</b>Lock money away for rent, school or a trip. It stays safe until the date you choose.</div></div><div class="cd rv"><h4>Save with your geng →</h4><svg viewBox="0 0 200 170"><g fill="#ffd9a0"><circle cx="100" cy="30" r="14"/><circle cx="163" cy="90" r="14"/><circle cx="100" cy="150" r="14"/><circle cx="37" cy="90" r="14"/></g><g fill="#8a97e0"><circle cx="145" cy="48" r="14"/><circle cx="145" cy="132" r="14"/><circle cx="55" cy="132" r="14"/><circle cx="55" cy="48" r="14"/></g></svg><div class="in2"><b>Ajo you can trust</b>Ajo is a rotating group savings pot: everyone pays in and one person collects each round. Here the pot is protected, and collateral covers anyone who slips.</div></div><div class="cd rv"><h4>Grow →</h4><svg viewBox="0 0 200 170"><path d="M10 140C70 140 80 90 120 70S170 30 190 20" stroke="#0067F5" stroke-width="6" fill="none"/><circle cx="60" cy="120" r="16" fill="#ffe08a"/><circle cx="105" cy="82" r="18" fill="#bfe6b9"/><circle cx="160" cy="40" r="20" fill="#8a97e0"/></svg><div class="in2"><b>Put idle money to work</b>Move spare balance into simple yield strategies and watch it quietly grow.</div></div></div></div></section>
+<section class="bl" id="bills"><div class="W"><div class="sh rv"><h2>Send and receive<br><b>on Solana</b></h2><p>Use Pollar to send SOL or supported SPL tokens, receive payments, and check your on-chain balance and transaction history.</p><a class="btn" href="#pay">Open payments</a></div>
+<div class="calc"><div class="c1 rv"><small>1. Send</small>Choose a Solana recipient and supported asset in Pollar’s payment flow.</div>
+<div class="c2 rv"><small>2. Receive</small>Share your Pollar wallet address to receive SOL or SPL tokens.</div>
+<div class="c3 rv"><small>3. Local rails</small>Naira ramps and Nigerian bill payments are not connected in this demo.</div></div>
+<p class="dot">● Transfers require user confirmation. Fees are sponsored only when enabled for the asset in Pollar.</p></div></section>
+<section class="sec" id="use-cases" style="padding-bottom:70px"><h2 class="W rv" style="font-size:clamp(32px,4.8vw,50px);font-weight:300;text-align:center;letter-spacing:-.04em">Whatever the goal, <b style="font-weight:600">you’re not alone.</b></h2><div class="qw"><div class="mq"><div><span>“</span>Save for my rent</div><div><span>“</span>Start an ajo with my geng</div><div><span>“</span>Pay my light bill with USDC</div><div><span>“</span>Turn my crypto into naira</div><div><span>“</span>Buy event tickets with friends</div><div><span>“</span>Grow my spare cash</div><div><span>“</span>Save for my rent</div><div><span>“</span>Start an ajo with my geng</div><div><span>“</span>Pay my light bill with USDC</div><div><span>“</span>Turn my crypto into naira</div><div><span>“</span>Buy event tickets with friends</div><div><span>“</span>Grow my spare cash</div></div></div></section>
+<section class="W cta rv"><p>You don’t have to figure it out alone.</p><a href="#signup"><i>→</i> Start with SolaWise</a></section>
+<div class="ck"><span>We use cookies to improve your experience. By continuing you agree to this.</span><button onclick="this.closest('.ck').remove()">OK</button></div>
+</div>
+
+<div id="auth" class="au hide">
+<div class="W"><a class="logo" href="#landing" style="padding-top:34px"><svg width="32" height="32" viewBox="0 0 34 34" fill="none" stroke="#0067F5" stroke-width="3.5"><circle cx="17" cy="17" r="14"/><circle cx="17" cy="17" r="7"/><circle cx="17" cy="17" r="1.5" fill="#0067F5"/></svg>SolaWise</a></div>
+<section id="v-login" class="W ag hide"><div><h1>Welcome back</h1><h2>Sign in to continue</h2><p class="mut">New to SolaWise? <a class="lk2" href="#signup">Create account</a></p></div>
+<div><form class="ac" onsubmit="login(event)" novalidate><div class="sso"><button type="button" onclick="sso('Google')"><span class="g">G</span>Sign in with Google</button><button type="button" onclick="sso('Apple')"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.7c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.9-3.5.9s-1.9-.8-3.1-.8C6.8 7.5 5.3 8.4 4.5 9.9c-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.8.8 3.1.8 2.1-1.2 2.9-2.4c.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.7-1-2.7-4.2zM14 5.6c.6-.8 1.1-1.9.9-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.8-1 2.9 1.1.1 2.2-.5 2.9-1.3z"/></svg>Sign in with Apple</button></div><div class="or">or</div>
+<div class="fl"><label for="le">Email Address</label><input id="le" type="email" autocomplete="email"></div><div class="fl"><label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password"><button type="button" class="eye" onclick="eye(this)" aria-label="Show or hide password"><span class="ms" style="font-size:20px">visibility</span></button></div><div class="er" id="lerr" role="alert"></div><button type="button" class="lk2" onclick="toast('Demo: a reset link would be emailed')">Forgot password?</button><button class="go" style="margin-top:22px">Sign in</button></form>
+<div class="af"><span>Trouble signing in? <button class="lk2" onclick="toast('Demo: support chat opens here')">Chat with us</button></span><span>Privacy | Terms</span></div><p class="mut" style="font-size:12px;margin-top:10px">Demo sign-in. No real account is created.</p></div></section>
+<section id="v-signup" class="W ag2 hide"><div><div class="ac"><div id="s1"><h1>Start your wealth journey</h1><p class="mut" style="margin:16px 0 28px">Got an account? <a class="lk2" href="#login">Sign In</a></p><div class="sso"><button type="button" onclick="sso('Google')"><span class="g">G</span>Sign up with Google</button></div><div class="or">or</div>
+<form onsubmit="sign1(event)" novalidate><div class="fl"><label for="se">Email Address</label><input id="se" type="email" autocomplete="email"></div><div class="er" id="serr" role="alert"></div><button class="go">Continue</button></form></div>
+<div id="s2" class="hide"><h1>Almost there</h1><p class="mut" style="margin:16px 0 28px">Tell us your name and choose a password.</p><form onsubmit="sign2(event)" novalidate><div class="fl"><label for="sn">Full name</label><input id="sn" type="text" autocomplete="name"></div><div class="fl"><label for="sp">Password (8+ characters)</label><input id="sp" type="password" autocomplete="new-password"><button type="button" class="eye" onclick="eye(this)" aria-label="Show or hide password"><span class="ms" style="font-size:20px">visibility</span></button></div><div class="er" id="serr2" role="alert"></div><button class="go">Create account</button><button type="button" class="lk2" style="margin-top:14px" onclick="su(1)">← Back</button></form></div></div>
+<p style="margin-top:18px;font-size:13px"><button class="lk2" onclick="toast('Demo: support chat opens here')">Need help?</button></p><p class="mut" style="font-size:12px;margin-top:8px">Demo sign-up. No real account is created.</p></div>
+<aside class="side2"><h3>Your geng is waiting</h3><p class="mut">Plan your savings, explore ajo with friends, or use Pollar to send and receive Solana assets. Start with any amount.</p><a class="pill2" href="#landing"><span class="ms">auto_awesome</span> See how it works</a><svg id="au" viewBox="0 0 420 520"></svg></aside></section></div>
+
+<div id="app" class="app hide">
+ <aside class="side"><button class="hb" id="dx" aria-label="Close menu"><span class="ms">close</span></button><a class="logo" href="#landing"><svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="#0067F5" stroke-width="3.5"><circle cx="17" cy="17" r="14"/><circle cx="17" cy="17" r="7"/></svg></a>
+  <div class="hi">Hi <b>Ada</b></div><div id="nav"></div><p class="note">Devnet demo. Rates and the ₦/$ conversion are placeholders.</p></aside>
+ <div class="main"><header class="top"><button class="hb" id="abtn" aria-label="Open menu" aria-expanded="false"><span class="ms">menu</span></button><h2 id="ttl"></h2>
+  <div class="r"><span class="pill">Devnet</span><a class="av" href="#profile" aria-label="Profile">A</a></div></header>
+  <div class="panel" id="view"></div></div>
+ <nav class="mbar" id="mnav"></nav>
+</div>
+
+<div class="ov" id="ov"></div>
+<script>
+const R=['home','save','invest','pay','ai','events','stash','profile','prefs'],FX=1550;
+const IC={home:'home',save:'savings',invest:'trending_up',pay:'payments',ai:'auto_awesome',events:'confirmation_number',stash:'account_balance_wallet',profile:'person',prefs:'settings'};
+const LB={home:'Home',save:'Save',invest:'Invest',pay:'Pay',ai:'Assistant',events:'Events',stash:'Stash',profile:'Profile',prefs:'Settings'};
+const S={bal:250000,show:true,tab:'home',goals:[{n:'Emergency',c:'--rt',t:0,s:0,d:'—',e:'umbrella'},{n:'Home',c:'--gt',t:0,s:0,d:'—',e:'home'},{n:'Study',c:'--at',t:0,s:0,d:'—',e:'school'}],
+circles:[{n:'Money Duo',c:'--rt',m:['You','Tunde'],a:20000,p:0,e:'favorite'},{n:'Football',c:'--gt',m:['You','Musa','Kemi','Ola'],a:10000,p:0,e:'sports_soccer'}],
+inv:0,tix:[],tx:[{k:'in',t:'Cash in via ramp',d:'Nov 21',a:250000}],
+ev:[{n:'Detty December Fest',w:'Dec 27 · Lagos',p:35000,e:'music_note',c:'--yt'},{n:'Afro Nation Night',w:'Dec 30 · Lekki',p:50000,e:'local_fire_department',c:'--rt'},{n:'Tech & Chill Meetup',w:'Jan 10 · Yaba',p:8000,e:'laptop_mac',c:'--bt'},{n:'Naija Food Fair',w:'Jan 17 · Abuja',p:5000,e:'restaurant',c:'--gt'}],
+st:[{n:'Stable Yield',d:'USDC lending vault',r:'6.5%',c:'--gt'},{n:'Tokenized Treasuries',d:'Short-term govt bonds',r:'4.8%',c:'--bt'},{n:'Naira Basket',d:'cNGN yield strategy',r:'12%',c:'--yt'}]};
+const N=x=>'₦'+Math.round(x).toLocaleString('en-NG'),$=id=>document.getElementById(id);
+const bal=()=>S.show?N(S.bal):'••••';
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.append(t);setTimeout(()=>t.remove(),2200)}
+function modal(h){const m=document.createElement('div');m.className='mask';m.innerHTML='<div class="dlg" role="dialog" aria-modal="true">'+h+'</div>';m.onclick=e=>{if(e.target==m||e.target.dataset.x!=null)m.remove()};document.body.append(m);const i=m.querySelector('input');i&&i.focus();return m}
+function cash(a,t){S.bal+=a;S.tx.unshift({k:'in',t:t||'Cash in via ramp',d:'Today',a});toast(N(a)+' added');go()}
+function addCash(){const m=modal(`<h3>Add cash</h3><p class="mut">Demo: cash-in will run through Pollar’s local ramp.</p><label>Amount (₦)</label><input id="a" type="number" value="20000" min="100"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Add cash</button></div>`);m.querySelector('#ok').onclick=()=>{const a=+m.querySelector('#a').value;if(a>0){m.remove();cash(a)}}}
+const chips=()=>`<div class="chips">${[20000,50000,100000].map(a=>`<button class="chip" onclick="cash(${a})">Demo +${N(a)}</button>`).join('')}${[100,200].map(a=>`<button class="chip" onclick="cash(${a*FX},'Demo cash in ($${a})')">Demo +$${a}</button>`).join('')}<button class="chip" onclick="addCash()" aria-label="Add demo amount">+</button></div>`;
+function pay(a,t,k){if(a>S.bal){toast('Not enough balance. Add cash first.');return false}S.bal-=a;S.tx.unshift({k:'out',t,d:'Today',a});return true}
+function newGoal(){const m=modal(`<h3>New goal</h3><label>Goal name</label><input id="n" placeholder="Rent, laptop, trip"><label>Target (₦)</label><input id="t" type="number" value="500000"><label>Maturity date</label><input id="d" type="date"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Create goal</button></div>`);m.querySelector('#ok').onclick=()=>{const n=m.querySelector('#n').value.trim(),d=m.querySelector('#d').value;if(!n||!d)return toast('Add a name and a maturity date');S.goals.push({n,c:'--bt',t:+m.querySelector('#t').value,s:0,d,e:'flag'});m.remove();go()}}
+function goal(i){const g=S.goals[i];const m=modal(`<h3>${g.n}</h3><p class="mut">${g.t?`Locked until ${g.d}. Saved ${N(g.s)} of ${N(g.t)}.`:'Empty goal. Set a target by creating a new one.'}</p><label>Save from balance (₦)</label><input id="a" type="number" value="10000"><div class="row"><button class="btn o" data-x>Close</button><button class="btn" id="ok">Lock funds</button></div>`);m.querySelector('#ok').onclick=()=>{const a=+m.querySelector('#a').value;if(a>0&&pay(a,'Locked in '+g.n)){g.s+=a;m.remove();go()}}}
+function newCircle(){const m=modal(`<h3>New ajo circle</h3><label>Circle name</label><input id="n" placeholder="Office ajo"><label>Members</label><select id="m"><option>3</option><option selected>5</option><option>8</option><option>10</option></select><label>Contribution per cycle (₦)</label><input id="a" type="number" value="20000"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Create circle</button></div>`);m.querySelector('#ok').onclick=()=>{const n=m.querySelector('#n').value.trim();if(!n)return toast('Name your circle');const k=+m.querySelector('#m').value;S.circles.push({n,c:'--yt',m:['You',...Array.from({length:k-1},(_,i)=>'Member '+(i+2))],a:+m.querySelector('#a').value,p:0,e:'group'});m.remove();go()}}
+function circle(i){const c=S.circles[i],who=c.m[c.p%c.m.length];const m=modal(`<h3>${c.n}</h3><p class="mut">${N(c.a)} each cycle · pot ${N(c.a*c.m.length)}. Collateral is locked when you join.</p><div class="rows">${c.m.map((x,j)=>`<div><span>${j+1}. ${x}</span><span class="mut">${j<c.p%c.m.length?'Received':j==c.p%c.m.length?'Receives this cycle':'Waiting'}</span></div>`).join('')}</div><div class="row"><button class="btn o" data-x>Close</button><button class="btn" id="ok">Contribute ${N(c.a)}</button></div>`);m.querySelector('#ok').onclick=()=>{if(pay(c.a,'Ajo: '+c.n)){c.p++;m.remove();toast(who+' receives the pot');go()}}}
+function invest(i){const s=S.st[i];const m=modal(`<h3>${s.n}</h3><p class="mut">${s.d}. Estimated ${s.r} a year (demo rate).</p><label>Amount (₦)</label><input id="a" type="number" value="25000"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Invest</button></div>`);m.querySelector('#ok').onclick=()=>{const a=+m.querySelector('#a').value;if(a>0&&pay(a,'Invested in '+s.n)){S.inv+=a;m.remove();go()}}}
+function buy(i){const e=S.ev[i];if(pay(e.p,'Ticket: '+e.n)){S.tix.push(e);toast('Ticket bought');go()}}
+function send(){const m=modal(`<h3>Send money</h3><label>Username</label><input id="u" placeholder="@tunde"><label>Amount (₦)</label><input id="a" type="number" value="5000"><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Send</button></div>`);m.querySelector('#ok').onclick=()=>{const u=m.querySelector('#u').value.trim(),a=+m.querySelector('#a').value;if(!u||!(a>0))return toast('Enter a username and amount');if(pay(a,'Sent to '+u)){m.remove();go()}}}
+S.usd=120;
+const BILLS=[{k:'Electricity',e:'bolt',c:'--yt',p:['Ikeja Electric','Eko DisCo','Abuja DisCo'],l:'Meter number'},{k:'Airtime',e:'call',c:'--gt',p:['MTN','Airtel','Glo','9mobile'],l:'Phone number'},{k:'Data',e:'signal_cellular_alt',c:'--bt',p:['MTN','Airtel','Glo','9mobile'],l:'Phone number'},{k:'Cable TV',e:'tv',c:'--rt',p:['DStv','GOtv','StarTimes'],l:'Smartcard number'},{k:'Internet',e:'language',c:'--at',p:['Spectranet','Smile'],l:'Account ID'}];
+function convert(){const m=modal(`<h3>Convert crypto to naira</h3><p class="mut">Demo rate ₦${FX} per $1 with a 0.5% fee. You hold $${S.usd.toFixed(2)}.</p><label>Token</label><select id="t"><option>USDC</option><option>USDT</option></select><label>Amount ($)</label><input id="a" type="number" value="50" min="1"><p id="o" style="margin-top:12px;font-weight:600"></p><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Convert</button></div>`);const a=m.querySelector("#a"),o=m.querySelector("#o"),up=()=>o.textContent="You get "+N((+a.value||0)*FX*.995);a.oninput=up;up();m.querySelector("#ok").onclick=()=>{const v=+a.value;if(!(v>0))return;if(v>S.usd)return toast("Not enough stablecoins");S.usd-=v;const n=v*FX*.995;S.bal+=n;S.tx.unshift({k:"in",t:"Converted $"+v+" "+m.querySelector("#t").value,d:"Today",a:n});m.remove();toast(N(n)+" added");go()}}
+function bill(i){const b=BILLS[i];const m=modal(`<h3>${b.k}</h3><label>Provider</label><select id="p">${b.p.map(x=>"<option>"+x+"</option>").join("")}</select><label>${b.l}</label><input id="n" placeholder="Enter number"><label>Amount (₦)</label><input id="a" type="number" value="${b.k=="Electricity"?5000:1000}"><label>Pay with</label><select id="w"><option value="n">Naira balance (${N(S.bal)})</option><option value="s">Stablecoins ($${S.usd.toFixed(2)})</option></select><div class="row"><button class="btn o" data-x>Cancel</button><button class="btn" id="ok">Pay bill</button></div>`);m.querySelector("#ok").onclick=()=>{const a=+m.querySelector("#a").value,n=m.querySelector("#n").value.trim(),w=m.querySelector("#w").value,p=m.querySelector("#p").value;if(!(a>0)||!n)return toast("Enter the number and amount");if(w=="n"){if(!pay(a,b.k+": "+p))return}else{const u=a/FX;if(u>S.usd)return toast("Not enough stablecoins");S.usd-=u;S.tx.unshift({k:"out",t:b.k+": "+p+" (USDC)",d:"Today",a})}m.remove();toast(b.k=="Electricity"?"Paid. Token: "+String(Math.random()).slice(2,18):"Payment successful");go()}}
+S.chat=[];let BUSY=0,DM=0;
+function bub(r,t){const d=document.createElement("div");d.className="bb2 "+r;d.textContent=t;$("msgs").append(d);d.scrollIntoView({block:"nearest"});return d}
+const fb=q=>{q=q.toLowerCase();return q.includes("ajo")?"Ajo is a rotating group savings pot: everyone pays in each round and one person collects. In SolaWise the pot is protected and collateral covers a missed payment, so your geng stays safe.":q.includes("convert")||q.includes("usdc")||q.includes("bill")?"Open Pay, choose Convert to naira, enter your USDC or USDT amount and confirm. Then pay light, data or cable from your naira or straight from stablecoins.":"A simple way to start: divide your target by the months left and lock that amount in a Goal each month, so it is out of reach until your date. Tell me what you are working towards and I will help you plan it."};
+async function ask(q){q=(q||$("q").value).trim();if(!q||BUSY)return;$("q").value="";S.chat.push({role:"user",content:q});bub("u",q);const out=bub("a","Thinking…");BUSY=1;let t;
+try{const sm=await claude.use("sample");if(!sm)throw 0;
+const ctx="Naira balance "+N(S.bal)+"; stablecoins $"+S.usd.toFixed(2)+"; goals: "+(S.goals.filter(g=>g.t).map(g=>g.n+" "+N(g.s)+" of "+N(g.t)+" by "+g.d).join("; ")||"none yet")+"; ajo circles: "+S.circles.map(c=>c.n+" ("+c.m.length+" members, "+N(c.a)+" per cycle)").join("; ")+"; invested "+N(S.inv);
+const sys="You are SolaWise Assistant, a warm, plain-spoken money guide for Nigerians saving alone or with their geng (ajo = rotating group savings). Be empathetic and concise (under 120 words), use naira, give practical next steps. You can explain goals, ajo, yield, converting stablecoins to naira and paying bills. You never move money and never promise returns; for investing say this is guidance, not financial advice. User data: "+ctx;
+const r=await sm(sys+"\n\nConversation so far:\n"+S.chat.slice(0,-1).slice(-8).map(m=>m.role+": "+m.content).join("\n")+"\n\nuser: "+q,{cache:false,onText:({text})=>{out.textContent=text}});t=r.text}catch(e){t=fb(q)}
+out.textContent=t;S.chat.push({role:"assistant",content:t});BUSY=0}
+async function mic(){try{const d=await claude.use("dictation");if(!d)return toast("Voice input isn’t available here");if(!DM){DM=1;d.onFinal(({text})=>{$("q").value+=text+" "})}await d.start()}catch(e){toast("Voice input isn’t available here")}}
+let TH="system";try{TH=localStorage.getItem("sw-theme")||"system"}catch(e){}
+if(TH!="system")document.documentElement.dataset.theme=TH;
+function setTheme(t){TH=t;const r=document.documentElement;t=="system"?r.removeAttribute("data-theme"):r.dataset.theme=t;try{localStorage.setItem("sw-theme",t)}catch(e){}go()}
+function eye(b){const i=b.previousElementSibling;i.type=i.type=="password"?"text":"password";b.firstChild.textContent=i.type=="password"?"visibility":"visibility_off"}
+function sso(n){toast("Demo: "+n+" sign-in connects through Pollar");location.hash="home"}
+const okm=m=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m);
+function login(e){e.preventDefault();const r=!okm($("le").value.trim())?"Enter a valid email address":$("lp").value.length<6?"Enter your password (at least 6 characters)":"";$("lerr").textContent=r;if(!r){toast("Welcome back");location.hash="home"}}
+function su(n){$("s1").classList.toggle("hide",n!=1);$("s2").classList.toggle("hide",n!=2)}
+function sign1(e){e.preventDefault();if(!okm($("se").value.trim()))return $("serr").textContent="Enter a valid email address";$("serr").textContent="";su(2)}
+function sign2(e){e.preventDefault();const n=$("sn").value.trim(),r=!n?"Tell us your name":$("sp").value.length<8?"Use at least 8 characters":"";$("serr2").textContent=r;if(!r){toast("Welcome to SolaWise, "+n.split(" ")[0]);location.hash="home"}}
+const card=(x,fn,sub)=>`<button class="gc" style="background:var(${x.c})" onclick="${fn}"><span class="ms" style="font-size:34px">${x.e}</span><b>${x.n}</b>${sub}</button>`;
+const plus=f=>`<button class="gc add" onclick="${f}" aria-label="Create new">+</button>`;
+const hdr=()=>`<div class="two"><div><p class="mut">Demo naira balance</p><b style="font-size:30px">${bal()}</b></div><div><b style="font-size:20px">Demo cash in</b><div style="margin-top:12px">${chips()}</div></div></div>`;
+function qr(){let h='';const s=Math.floor(Date.now()/5000);for(let i=0;i<81;i++){const r=i%9,c=(i/9|0);const f=(r<3&&c<3)||(r>5&&c<3)||(r<3&&c>5);h+=`<i class="${f||((s*31+i*i*7+i*13)%5<2)?'k':''}"></i>`}return h}
+const V={
+home(){const tot=S.bal+S.inv+S.goals.reduce((a,g)=>a+g.s,0)+S.circles.reduce((a,c)=>a+c.p*c.a,0);
+return `<div class="tabs"><button class="${S.tab=='home'?'on':''}" onclick="S.tab='home';go()">Home</button><button class="${S.tab=='port'?'on':''}" onclick="S.tab='port';go()">Portfolio</button></div>
+<div class="two"><div>${S.tab=='home'?`<div class="bal"><div class="t"><span>Demo Naira balance <button onclick="S.show=!S.show;go()" aria-label="Show or hide balance"><span class="ms" style="font-size:20px">${S.show?"visibility":"visibility_off"}</span></button></span><span><span class="ms" style="font-size:18px">bolt</span> 5</span></div><div class="n">${bal()}</div><svg viewBox="0 0 400 110" preserveAspectRatio="none"><path d="M0 40H110C120 40 120 80 130 80H260C270 80 270 105 280 105H400V110H0Z" fill="rgba(255,255,255,.2)"/></svg><span class="tag">Locked in goals: ${S.show?N(S.goals.reduce((a,g)=>a+g.s,0)):'••••'}</span></div>
+<div class="box"><b style="font-size:20px">Take action</b><button class="act" onclick="location.hash='ai'"><i style="background:var(--blue)"></i><span><b>Ask SolaWise AI</b><br><small>Get a savings plan, or ask about your ajo and bills.</small></span></button><button class="act" onclick="pollarAction('balances')"><i></i><span><b>Open your Pollar wallet</b><br><small>View real on-chain Solana balances and payment actions.</small></span></button></div>`:`<div class="rows"><div><span>Wallet</span><b>${N(S.bal)}</b></div><div><span>Goals</span><b>${N(S.goals.reduce((a,g)=>a+g.s,0))}</b></div><div><span>Invested</span><b>${N(S.inv)}</b></div><div><span>Ajo payouts received</span><b>${N(S.circles.reduce((a,c)=>a+c.p*c.a,0))}</b></div><div><span>Total</span><b>${N(tot)}</b></div></div>`}</div>
+<div><h3 class="s" style="margin-top:0">Demo cash in</h3>${chips()}<div class="promo"><h4>Detty December is coming. Save for your ticket.</h4><button onclick="location.hash='events'">Browse events</button></div></div></div>`},
+save(){return hdr()+`<h3 class="s">Save by myself</h3><div class="grid">${plus('newGoal()')}${S.goals.map((g,i)=>card(g,`goal(${i})`,g.t?`<div class="bar"><i style="width:${Math.min(100,g.s/g.t*100)}%"></i></div><em>${N(g.s)} · until ${g.d}</em>`:'<em>EMPTY</em>')).join('')}</div><h3 class="s">Save with others (ajo)</h3><div class="grid">${plus('newCircle()')}${S.circles.map((c,i)=>card(c,`circle(${i})`,`<em>${c.m.length} members · ${N(c.a)} each cycle</em><em>Next to receive: ${c.m[c.p%c.m.length]}</em>`)).join('')}</div>`},
+invest(){return hdr()+`<h3 class="s">Invest for yourself</h3><div class="grid">${S.st.map((s,i)=>`<button class="gc" style="background:var(${s.c})" onclick="invest(${i})"><b>${s.n}</b><span class="mut">${s.d}</span><em>Est. ${s.r} a year (demo)</em></button>`).join('')}</div><p class="mut" style="margin-top:20px">Invested so far: <b>${N(S.inv)}</b>. Strategies route through existing Solana protocols.</p>`},
+events(){return `<h3 class="s" style="margin-top:0">Upcoming events</h3><div class="grid evg">${S.ev.map((e,i)=>`<div class="ev"><div class="im" style="background:var(${e.c})"><span class="ms" style="font-size:48px">${e.e}</span></div><div class="bd"><b>${e.n}</b><p class="mut">${e.w}</p><p class="mut" style="font-size:13px">Resale capped at face value + 10%</p><div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px"><b>${N(e.p)}</b><button class="btn" onclick="buy(${i})">Buy ticket</button></div></div></div>`).join('')}</div><h3 class="s">My tickets</h3>${S.tix.length?S.tix.map(t=>`<div class="tk"><div class="qr" data-qr>${qr()}</div><div><b>${t.n}</b><p class="mut">${t.w}<br>Code refreshes every 5 seconds</p></div></div>`).join(''):'<p class="mut">No tickets yet. Buy one above, or save toward it in Goals.</p>'}`},
+stash(){return pollarWalletPanel()},
+ai(){return `<div class="chat"><b style="font-size:24px">Hi Ada, how can I help?</b><p class="mut" style="margin:6px 0 16px">Ask about saving, your ajo, investing or paying bills. I only give guidance and never move your money.</p><div class="chips">${["Plan my monthly savings","Is my ajo safe?","Pay my light bill with USDC","Explain ajo simply"].map(x=>`<button class="chip" onclick="ask(this.textContent)">${x}</button>`).join("")}</div><div id="msgs" class="msgs"></div><div class="cin"><input id="q" placeholder="Ask SolaWise…" onkeydown="if(event.key==='Enter')ask()" aria-label="Ask a question"><button class="chip" onclick="mic()" aria-label="Speak your question"><span class="ms">mic</span></button><button class="btn" onclick="ask()">Send</button></div></div>`},
+prefs(){const o=[["system","System","brightness_auto"],["light","Light","light_mode"],["dark","Dark","dark_mode"]];return `<div style="max-width:560px"><h3 class="s" style="margin-top:0">Appearance</h3><p class="mut">Choose how SolaWise looks on this device.</p><div class="seg" role="radiogroup" aria-label="Theme">${o.map(([v,l,i])=>`<button role="radio" aria-checked="${TH==v}" class="${TH==v?"on":""}" onclick="setTheme('${v}')"><span class="ms">${i}</span>${l}</button>`).join("")}</div><a class="btn o" href="#login" style="margin-top:32px">Sign out</a></div>`},
+pay(){return pollarWalletPanel()+`<h3 class="s">Demo services (not connected to Pollar)</h3><div class="two"><div><p class="mut">Simulated stablecoin balance</p><b style="font-size:30px">${S.show?"$"+S.usd.toFixed(2):"••••"}</b><p class="mut" style="margin-top:4px">≈ ${S.show?N(S.usd*FX):"••••"}</p><div class="box"><b style="font-size:20px">Convert crypto to naira</b><p class="mut">Demo rate ₦${FX} per $1. No Naira on/off-ramp is connected.</p><div class="chips" style="margin-top:12px"><button class="btn" onclick="convert()">Run demo conversion</button><button class="btn o" onclick="S.usd+=50;toast('$50 demo USDC received');go()">Get demo USDC</button></div></div></div><div><b style="font-size:20px">Simulated naira balance</b><p style="font-size:26px;font-weight:700;margin-top:4px">${bal()}</p><p class="mut">Not your on-chain wallet balance.</p></div></div><h3 class="s">Simulated bill payments</h3><div class="grid">${BILLS.map((b,i)=>`<button class="gc" style="background:var(${b.c})" onclick="bill(${i})"><span class="ms" style="font-size:34px">${b.e}</span><b>${b.k}</b><em>Simulation only</em></button>`).join("")}</div><p class="mut" style="margin-top:20px">These demo actions do not move funds. Pollar payment modals above send actual supported Solana assets.</p>`},
+profile(){return `<div style="max-width:560px" class="rows"><div><span>Username</span><b>@ada</b></div><div><span>Phone</span><b>Sign in with Pollar</b></div><div><span>Wallet</span><b>Not connected</b></div><div><span>Network</span><b>Solana devnet</b></div><div><span>Program ID</span><b style="word-break:break-all">Paste after anchor deploy</b></div></div>`}};
+function go(){drawer(0,'l');drawer(0,'a');const h=location.hash.slice(1),on=R.includes(h);const au=h=='login'||h=='signup';$('landing').classList.toggle('hide',on||au);$('auth').classList.toggle('hide',!au);$('v-login').classList.toggle('hide',h!='login');$('v-signup').classList.toggle('hide',h!='signup');if(au){scrollTo(0,0);if(h=='signup')su(1)}$('app').classList.toggle('hide',!on);if(!on){if(!h||h=='landing')scrollTo(0,0);return}
+const nv=R.map(r=>`<a class="nav ${r==h?'on':''}" href="#${r}"><span class="ms">${IC[r]}</span>${LB[r]}</a>`).join('');$('nav').innerHTML=nv;$('mnav').innerHTML=nv;$('ttl').textContent=h=='home'?'Account overview':LB[h];$('view').innerHTML=V[h]();if(h=='ai')S.chat.forEach(m=>bub(m.role=='user'?'u':'a',m.content))}
+addEventListener('hashchange',()=>{go();if(R.includes(location.hash.slice(1)))scrollTo(0,0)});
+
+setInterval(()=>{document.querySelectorAll('[data-qr]').forEach(q=>q.innerHTML=qr())},5000);
+const coin=(x,y,rx,ry,f,e)=>`<g class="bb"><ellipse cx="${x+12}" cy="${y}" rx="${rx}" ry="${ry}" fill="${e}"/><ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="${f}"/></g>`;
+function iso(id,c1,c2){let b='<defs><pattern id="p'+id+'" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="2" height="4" fill="#9fd8f3"/><rect x="2" width="2" height="4" fill="#e3f5fd"/></pattern></defs>';for(let k=4;k>=0;k--){const x=30+k*52,y=340-k*58,h=150+k*58;b+=`<polygon points="${x},${y} ${x+60},${y-30} ${x+120},${y} ${x+60},${y+30}" fill="#aee0f7"/><polygon points="${x},${y} ${x+60},${y+30} ${x+60},${y+30+h} ${x},${y+h}" fill="url(#p${id})"/><polygon points="${x+60},${y+30} ${x+120},${y} ${x+120},${y+h} ${x+60},${y+30+h}" fill="#cfeefb"/>`}
+b+='<path d="M60 400V520M122 400V520M60 425H122M60 455H122M60 485H122" stroke="#8cc4f2" fill="none" stroke-width="2"/>'+c1+c2;$(id).innerHTML=b}
+iso('sl',coin(300,70,32,46,'#fde1e5','#ef7b86'),coin(100,380,56,78,'#cdeccb','#a9d9a4'));
+iso('sr',coin(300,60,42,72,'#ffeea4','#fbd75e'),coin(100,390,42,62,'#b3b9ea','#6a73c9'));
+iso('au',coin(300,70,34,50,'#fde1e5','#ef7b86'),coin(110,380,48,70,'#cdeccb','#a9d9a4'));
+const io=new IntersectionObserver(e=>e.forEach(x=>{if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target)}}),{threshold:.12});
+document.querySelectorAll('.rv').forEach(e=>io.observe(e));
+function drawer(on,w){const d=w=='l'?$('ldr'):document.querySelector('.side');d.classList.toggle(w=='l'?'on':'open',!!on);$('ov').classList.toggle('on',!!on);document.body.style.overflow=on?'hidden':'';[$('lhb'),$('abtn')].forEach(b=>b.setAttribute('aria-expanded',!!on))}
+$('lhb').onclick=()=>drawer(1,'l');$('abtn').onclick=()=>drawer(1,'a');$('dx').onclick=()=>drawer(0,'a');$('ov').onclick=()=>{drawer(0,'l');drawer(0,'a')};
+addEventListener('keydown',e=>{if(e.key=='Escape'){drawer(0,'l');drawer(0,'a')}});
+
+let pollarUiState={isAuthenticated:false,walletAddress:null};
+function pollarAction(action){
+ if(!pollarUiState.isAuthenticated){location.hash='login';return}
+ if(window.parent===window){toast('Pollar payments are available on the SolaWise app page.');return}
+ window.parent.postMessage({type:'solawise:pollar-action',action},location.origin)
+}
+function pollarWalletPanel(){
+ const state=pollarUiState;
+ const header=`<div class="two"><div><p class="mut">Pollar Solana wallet</p><b style="font-size:20px">${state.walletAddress?escapePollarValue(state.walletAddress):'Wallet not connected'}</b></div><div class="chips"><button class="btn" onclick="pollarAction('send')">Send</button><button class="btn o" onclick="pollarAction('receive')">Receive</button></div></div>`;
+ if(!state.isAuthenticated){
+  return `<div class="box"><h3 class="s" style="margin-top:0">Your on-chain wallet</h3><p class="mut">Sign in with Pollar to see balances and send or receive Solana assets.</p><button class="btn" style="margin-top:14px" onclick="location.hash='login'">Sign in with Pollar</button></div>`;
+ }
+ if(!state.hasWallet){
+  return `<div class="box"><h3 class="s" style="margin-top:0">Activate your Solana wallet</h3><p class="mut">Your Pollar account is signed in, but this app has not provisioned a wallet yet.</p><button class="btn" style="margin-top:14px" onclick="pollarAction('create-wallet')">Create wallet</button></div>`;
+ }
+ const assets=state.balances.filter(balance=>balance.chain==='SOLANA');
+ const rows=assets.map(asset=>`<div class="tx"><i class="in"><span class="ms">account_balance_wallet</span></i><div>${escapePollarValue(asset.code)}<small>Solana · on-chain balance</small></div><b>${asset.balance===null?'Unavailable':escapePollarValue(asset.balance)}</b></div>`).join('');
+ const content=state.balanceState==='loading'
+  ?'<p class="mut">Loading on-chain balances…</p>'
+  :state.balanceState==='error'
+   ?'<p class="mut">Balance unavailable. Refresh to try again.</p>'
+   :rows||'<p class="mut">No Solana balances returned yet. Receive an asset or open the Pollar balance view.</p>';
+ return `<div class="box"><h3 class="s" style="margin-top:0">Your on-chain wallet</h3>${header}${content}<div class="chips" style="margin-top:16px"><button class="chip" onclick="pollarAction('balances')">All balances</button><button class="chip" onclick="pollarAction('history')">Transaction history</button><button class="chip" onclick="pollarAction('refresh')">Refresh balances</button></div><p class="mut" style="margin-top:12px;font-size:13px">Transfers use Pollar’s Solana SDK and require your confirmation. Fees are sponsored only when enabled for the asset in Pollar.</p></div>`;
+}
+function pollarRequest(provider,email){
+ if(window.parent===window)return toast('Pollar sign-in is available on the SolaWise app page.');
+ window.parent.postMessage({type:'solawise:pollar-login',provider,email},location.origin)
+}
+function sso(provider){
+ const normalized=provider.toLowerCase();
+ pollarRequest(normalized==='google'?'google':normalized==='github'?'github':'wallet')
+}
+function login(e){
+ e.preventDefault();
+ const email=$('le').value.trim();
+ if(!okm(email))return $('lerr').textContent='Enter a valid email address';
+ $('lerr').textContent='';
+ pollarRequest('email',email)
+}
+function sign1(e){
+ e.preventDefault();
+ const email=$('se').value.trim();
+ if(!okm(email))return $('serr').textContent='Enter a valid email address';
+ $('serr').textContent='';
+ pollarRequest('email',email)
+}
+function sign2(e){e.preventDefault();pollarRequest('email',$('se').value.trim())}
+const originalHome=V.home;
+V.home=()=>originalHome().replace(
+ "onclick=\"toast('Demo: Pollar login connects here')\"",
+ "onclick=\"sso('wallet')\"",
+);
+const githubButton=document.querySelector('#v-login .sso button:nth-child(2)');
+if(githubButton)githubButton.innerHTML='<span class="g">GH</span>Sign in with GitHub';
+const passwordField=$('lp')?.closest('.fl');
+if(passwordField){
+ passwordField.innerHTML='<p class="mut" style="margin:0">We will send a one-time sign-in code to your email.</p>';
+}
+document.querySelector('#v-login .ac button.lk2[type="button"]')?.remove();
+const loginNote=document.querySelector('#v-login .ac .or');
+if(loginNote)loginNote.textContent='or use your email';
+document.querySelectorAll('#auth .mut').forEach(el=>{
+ if(el.textContent.includes('Demo sign-in')||el.textContent.includes('Demo sign-up')){
+  el.textContent='Sign in securely with Pollar. No password required.';
+ }
+});
+const signupButtons=document.querySelector('#v-signup .sso');
+if(signupButtons){
+ const githubButton=document.createElement('button');
+ githubButton.type='button';
+ githubButton.innerHTML='<span class="g">GH</span>Sign up with GitHub';
+ githubButton.addEventListener('click',()=>sso('github'));
+ signupButtons.append(githubButton);
+}
+const originalProfile=V.profile;
+function escapePollarValue(value){
+ return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+V.profile=()=>{
+ const markup=originalProfile();
+ const wallet=pollarUiState.walletAddress
+  ?escapePollarValue(pollarUiState.walletAddress)
+  :pollarUiState.isAuthenticated?'Creating Solana wallet…':'Not connected';
+ return markup
+  .replace('Not connected',wallet)
+  .replace('Sign in with Pollar',pollarUiState.isAuthenticated?'Signed in with Pollar':'Pollar email / social sign-in');
+};
+addEventListener('message',event=>{
+ if(event.origin!==location.origin||event.source!==parent||!event.data||typeof event.data!=='object')return;
+ const message=event.data;
+ if(message.type==='solawise:pollar-error'){
+  toast(typeof message.message==='string'?message.message:'Pollar sign-in failed.');
+ }else if(message.type==='solawise:pollar-state'){
+  pollarUiState={
+   isAuthenticated:message.isAuthenticated===true,
+   hasWallet:message.hasWallet===true,
+   balanceState:typeof message.balanceState==='string'?message.balanceState:'idle',
+   balances:Array.isArray(message.balances)?message.balances:[],
+   walletAddress:typeof message.walletAddress==='string'?message.walletAddress:null,
+  };
+  if(pollarUiState.isAuthenticated&&(location.hash==='#login'||location.hash==='#signup')){
+   toast(pollarUiState.walletAddress?'Pollar wallet connected':'Signed in; wallet is being prepared');
+   location.hash='home';
+  }else if(['#profile','#stash','#pay'].includes(location.hash)){
+   go();
+  }
+ }
+});
+document.addEventListener('click',event=>{
+ const target=event.target;
+ if(!(target instanceof Element)||!target.closest('#view a[href="#login"]'))return;
+ event.preventDefault();
+ if(window.parent!==window){
+  window.parent.postMessage({type:'solawise:pollar-logout'},location.origin);
+ }
+ pollarUiState={isAuthenticated:false,walletAddress:null};
+ location.hash='landing';
+});
+go();
+</script></body></html>

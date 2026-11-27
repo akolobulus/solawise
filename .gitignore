@@ -1,0 +1,5 @@
+.anchor/
+.env.local
+node_modules/
+.next/
+target/

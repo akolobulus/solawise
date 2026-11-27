@@ -1,0 +1,24 @@
+[package]
+name = "solawise"
+version = "0.1.0"
+description = "SolaWise savings goals and ajo circles on Solana"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "solawise"
+
+[features]
+default = []
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "1.2.2"
+anchor-spl = "1.2.2"

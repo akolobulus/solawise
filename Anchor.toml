@@ -1,0 +1,17 @@
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+solawise = "7g5t6wDmwmNsgSxTJKqy3gbck2PYRqTsKjXj6PGgq16h"
+
+[provider]
+cluster = "localnet"
+wallet = "~/Solawise/.anchor/wallet.json"
+
+[scripts]
+test = "npm run test:anchor"
+
+[hooks]
