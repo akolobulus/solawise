@@ -4,8 +4,15 @@ import {
   PollarProvider,
   usePollar,
 } from "@pollar/react";
-import type { AuthState } from "@pollar/core";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   clusterApiUrl,
   Connection,
@@ -24,12 +31,22 @@ import {
   runProgramAction,
 } from "./anchor-program";
 import type { SolanaTransactionSigner } from "./anchor-program";
+import {
+  getSupabaseBrowserClient,
+  type LinkedAccount,
+  type LinkedAccountProvider,
+  type SupabaseBrowserClient,
+} from "./supabase";
 
 type PhantomProvider = {
   isPhantom?: boolean;
   publicKey: PublicKey | null;
   connect(options?: { onlyIfTrusted?: boolean }): Promise<{ publicKey: PublicKey }>;
   disconnect(): Promise<void>;
+  signMessage?(
+    message: Uint8Array,
+    display?: "utf8" | "hex",
+  ): Promise<{ signature: Uint8Array; publicKey: PublicKey }>;
   signTransaction<T extends Transaction | VersionedTransaction>(transaction: T): Promise<T>;
   signAllTransactions<T extends Transaction | VersionedTransaction>(transactions: T[]): Promise<T[]>;
   on(event: "accountChanged", callback: (publicKey: PublicKey | null) => void): void;
@@ -113,22 +130,28 @@ function PollarBridge({
   frameLoaded,
   authRoute,
   setAuthRoute,
+  supabase,
+  supabaseUser,
+  supabaseAuthReady,
+  supabaseAuthError,
 }: {
   frameRef: React.RefObject<HTMLIFrameElement | null>;
   frameLoaded: boolean;
   authRoute: AuthRoute;
   setAuthRoute: (route: AuthRoute) => void;
+  supabase: SupabaseBrowserClient | null;
+  supabaseUser: User | null;
+  supabaseAuthReady: boolean;
+  supabaseAuthError: string | null;
 }) {
   const {
     isAuthenticated,
     verified,
     hasWallet,
     wallets,
-    getClient,
     walletBalance,
     configStatus,
     appConfig,
-    login,
     openLoginModal,
     logout,
     createWallet,
@@ -148,8 +171,14 @@ function PollarBridge({
     usdc: string | null;
   }>({ step: "idle", sol: null, usdc: null });
   const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
   const phantomProvider = useRef<PhantomProvider | null>(null);
   const walletCreationStarted = useRef(false);
+  const pendingPhantomLink = useRef(false);
+  const pendingPollarLink = useRef(false);
   const balances = useMemo(
     () =>
       walletBalance.step === "loaded"
@@ -162,6 +191,114 @@ function PollarBridge({
         : [],
     [walletBalance],
   );
+
+  const postToFrame = useCallback(
+    (message: Record<string, unknown>) => {
+      frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+    },
+    [frameRef],
+  );
+
+  const saveLinkedAccount = useCallback(
+    async (
+      provider: LinkedAccountProvider,
+      walletAddress: string,
+    ): Promise<boolean> => {
+      if (!supabase || !supabaseUser) return false;
+      try {
+        const { error } = await supabase.from("linked_accounts").upsert(
+          {
+            user_id: supabaseUser.id,
+            provider,
+            wallet_address: walletAddress,
+          },
+          { onConflict: "user_id,provider" },
+        );
+        if (error) throw error;
+      } catch (error) {
+        const detail =
+          error instanceof Error ? error.message : "The database request failed.";
+        const message = `Could not save the ${provider === "pollar" ? "Pollar" : "Phantom"} link: ${detail}`;
+        setAuthMessage(message);
+        postToFrame({ type: "solawise:account-link-error", message });
+        return false;
+      }
+
+      setLinkedAccounts((current) => [
+        ...current.filter((account) => account.provider !== provider),
+        {
+          user_id: supabaseUser.id,
+          provider,
+          wallet_address: walletAddress,
+          linked_at:
+            current.find((account) => account.provider === provider)?.linked_at ??
+            new Date().toISOString(),
+        },
+      ]);
+      postToFrame({ type: "solawise:account-linked", provider, walletAddress });
+      setAuthMessage(null);
+      return true;
+    },
+    [postToFrame, supabase, supabaseUser],
+  );
+
+  useEffect(() => {
+    if (!supabase || !supabaseUser) {
+      setLinkedAccounts([]);
+      return;
+    }
+
+    let active = true;
+    setLinkedAccounts([]);
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("linked_accounts")
+          .select("user_id,provider,wallet_address,linked_at")
+          .eq("user_id", supabaseUser.id);
+        if (!active) return;
+        if (error) throw error;
+        setLinkedAccounts(data ?? []);
+      } catch (error) {
+        if (!active) return;
+        const detail =
+          error instanceof Error ? error.message : "The database request failed.";
+        const message = `Could not load your linked accounts: ${detail}`;
+        setAuthMessage(message);
+        postToFrame({ type: "solawise:account-link-error", message });
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [postToFrame, supabase, supabaseUser?.id]);
+
+  useEffect(() => {
+    if (!supabaseUser || !pendingPhantomLink.current || !phantomAddress) return;
+    pendingPhantomLink.current = false;
+    void saveLinkedAccount("phantom", phantomAddress);
+  }, [phantomAddress, saveLinkedAccount, supabaseUser]);
+
+  useEffect(() => {
+    if (
+      !supabaseUser ||
+      !pendingPollarLink.current ||
+      !isAuthenticated ||
+      !verified ||
+      !solanaWallet?.address
+    ) {
+      return;
+    }
+    pendingPollarLink.current = false;
+    void saveLinkedAccount("pollar", solanaWallet.address);
+  }, [
+    isAuthenticated,
+    saveLinkedAccount,
+    solanaWallet?.address,
+    supabaseUser,
+    verified,
+  ]);
 
   useEffect(() => {
     const provider = getPhantomProvider();
@@ -195,16 +332,29 @@ function PollarBridge({
 
   useEffect(() => {
     window.solawiseConnectPhantom = () => {
+      if (!supabaseUser) {
+        setAuthMessage("Sign in with your SolaWise account before linking Phantom.");
+        setAuthRoute("login");
+        return;
+      }
+
+      pendingPhantomLink.current = true;
+      if (phantomAddress) {
+        pendingPhantomLink.current = false;
+        void saveLinkedAccount("phantom", phantomAddress);
+        return;
+      }
+
       const provider = getPhantomProvider();
       const frame = frameRef.current?.contentWindow;
       if (!provider) {
         setAuthMessage(
-          "Phantom was not detected. Enable its Chrome extension, then refresh this page or use Pollar sign-in.",
+          "Phantom was not detected. Enable its Chrome extension and refresh, or link a Pollar account for spending.",
         );
         frame?.postMessage(
           {
             type: "solawise:wallet-error",
-            message: "Phantom was not detected. Enable its Chrome extension, then refresh this page or use Pollar sign-in.",
+            message: "Phantom was not detected. Enable its Chrome extension and refresh, or link a Pollar account for spending.",
           },
           window.location.origin,
         );
@@ -248,7 +398,13 @@ function PollarBridge({
     return () => {
       delete window.solawiseConnectPhantom;
     };
-  }, [frameRef]);
+  }, [
+    frameRef,
+    phantomAddress,
+    saveLinkedAccount,
+    setAuthRoute,
+    supabaseUser,
+  ]);
 
   useEffect(() => {
     if (!phantomAddress) {
@@ -296,6 +452,12 @@ function PollarBridge({
         type: "solawise:pollar-state",
         isAuthenticated,
         verified,
+        supabaseAuthenticated: Boolean(supabaseUser),
+        supabaseEmail: supabaseUser?.email ?? null,
+        linkedAccounts: linkedAccounts.map(({ provider, wallet_address }) => ({
+          provider,
+          walletAddress: wallet_address,
+        })),
         hasWallet,
         walletAddress: solanaWallet?.address ?? null,
         walletCustody: solanaWallet?.custody ?? null,
@@ -317,11 +479,13 @@ function PollarBridge({
     frameRef,
     hasWallet,
     isAuthenticated,
+    linkedAccounts,
     phantomAddress,
     phantomAvailable,
     phantomBalance,
     solanaWallet?.address,
     solanaWallet?.custody,
+    supabaseUser,
     verified,
     walletBalance.step,
   ]);
@@ -386,36 +550,6 @@ function PollarBridge({
 
   useEffect(() => {
     if (!frameLoaded) return;
-    const client = getClient();
-    const publishAuthState = (state: AuthState) => {
-      if (state.step === "error") {
-        setAuthMessage(state.message);
-      } else if (state.step === "sending_email") {
-        setAuthMessage("Pollar is sending your verification code.");
-      } else if (state.step === "entering_code" || state.step === "verifying_email_code") {
-        setAuthMessage("Complete the verification step in the Pollar sign-in window.");
-      } else if (state.step === "authenticated" && state.verified) {
-        setAuthMessage(null);
-      }
-
-      frameRef.current?.contentWindow?.postMessage(
-        {
-          type: "solawise:pollar-auth-state",
-          step: state.step,
-          email: "email" in state ? state.email : null,
-          message: state.step === "error" ? state.message : null,
-          previousStep: state.step === "error" ? state.previousStep : null,
-        },
-        window.location.origin,
-      );
-    };
-
-    publishAuthState(client.getAuthState());
-    return client.onAuthStateChange(publishAuthState);
-  }, [frameLoaded, frameRef, getClient, setAuthMessage]);
-
-  useEffect(() => {
-    if (!frameLoaded) return;
     let active = true;
     void getProgramSnapshot(
       phantomAddress,
@@ -438,10 +572,15 @@ function PollarBridge({
   ]);
 
   useEffect(() => {
-    if (!phantomAddress && !(isAuthenticated && verified)) return;
+    if (!supabaseUser) return;
     setAuthRoute(null);
     setAuthMessage(null);
-  }, [isAuthenticated, phantomAddress, setAuthRoute, verified]);
+  }, [setAuthRoute, supabaseUser]);
+
+  useEffect(() => {
+    pendingPhantomLink.current = false;
+    pendingPollarLink.current = false;
+  }, [supabaseUser?.id]);
 
   useEffect(() => {
     if (!isAuthenticated || !verified || !hasWallet) return;
@@ -461,6 +600,183 @@ function PollarBridge({
       );
     });
   }, [frameRef, hasWallet, isAuthenticated, refreshWalletBalance, verified]);
+
+  const requestPollarLink = useCallback(() => {
+    if (!supabaseUser) {
+      setAuthMessage("Sign in with your SolaWise account before linking Pollar.");
+      setAuthRoute("login");
+      return;
+    }
+
+    pendingPollarLink.current = true;
+    if (isAuthenticated && verified) {
+      if (solanaWallet?.address) {
+        pendingPollarLink.current = false;
+        void saveLinkedAccount("pollar", solanaWallet.address);
+      } else {
+        postToFrame({
+          type: "solawise:pollar-error",
+          message: "Pollar is connected. Create its Solana wallet before linking it for spending.",
+        });
+      }
+      return;
+    }
+
+    setAuthMessage(null);
+    try {
+      openLoginModal();
+    } catch (error) {
+      setAuthMessage(
+        error instanceof Error ? error.message : "Pollar linking could not be opened.",
+      );
+    }
+  }, [
+    isAuthenticated,
+    openLoginModal,
+    postToFrame,
+    saveLinkedAccount,
+    setAuthRoute,
+    solanaWallet?.address,
+    supabaseUser,
+    verified,
+  ]);
+
+  const submitSupabaseAuth = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    if (!supabase) {
+      setAuthMessage(
+        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, then restart the app.",
+      );
+      return;
+    }
+
+    const email = authEmail.trim().toLowerCase();
+    if (!email || !authPassword) {
+      setAuthMessage("Enter your email and password.");
+      return;
+    }
+
+    setAuthBusy(true);
+    setAuthMessage(null);
+    try {
+      if (authRoute === "signup") {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password: authPassword,
+          options: { emailRedirectTo: window.location.origin },
+        });
+        if (error) throw error;
+        if (!data.session) {
+          setAuthMessage(
+            "Email confirmation is enabled in Supabase. To sign up without a verification code, disable Confirm email in Authentication > Providers > Email, then try again.",
+          );
+          setAuthPassword("");
+          return;
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password: authPassword,
+        });
+        if (error) throw error;
+      }
+      setAuthPassword("");
+      setAuthMessage(null);
+    } catch (error) {
+      setAuthMessage(
+        error instanceof Error
+          ? error.message
+          : "Supabase sign-in could not be completed.",
+      );
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const signInWithPhantom = async () => {
+    if (!supabase) {
+      setAuthMessage(
+        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, then restart the app.",
+      );
+      return;
+    }
+
+    const provider = getPhantomProvider();
+    if (!provider) {
+      setAuthMessage("Phantom was not detected. Install or enable its browser extension.");
+      return;
+    }
+    if (typeof provider.signMessage !== "function") {
+      setAuthMessage("This Phantom connection does not support signing authentication messages.");
+      return;
+    }
+
+    setAuthBusy(true);
+    setAuthMessage("Approve the SolaWise sign-in message in Phantom. No verification code is needed.");
+    try {
+      const { publicKey } = await provider.connect();
+      phantomProvider.current = provider;
+      setPhantomAddress(publicKey.toBase58());
+      pendingPhantomLink.current = true;
+      const { error } = await supabase.auth.signInWithWeb3({
+        chain: "solana",
+        statement: "Sign in to SolaWise. This message does not authorize a transaction.",
+        wallet: {
+          publicKey,
+          signMessage: async (message) => {
+            const result = await provider.signMessage!(message, "utf8");
+            return result.signature;
+          },
+        },
+      });
+      if (error) throw error;
+      setAuthMessage(null);
+      setAuthRoute(null);
+    } catch (error) {
+      pendingPhantomLink.current = false;
+      setAuthMessage(
+        error instanceof Error ? error.message : "Phantom sign-in could not be completed.",
+      );
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const signOutOfSolaWise = async () => {
+    if (!supabase) return;
+    setAuthBusy(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (error) {
+      setAuthMessage(
+        `Could not sign out: ${error instanceof Error ? error.message : "The Supabase request failed."}`,
+      );
+      setAuthBusy(false);
+      return;
+    }
+
+    logout();
+    pendingPhantomLink.current = false;
+    pendingPollarLink.current = false;
+    try {
+      await phantomProvider.current?.disconnect();
+    } catch (error) {
+      postToFrame({
+        type: "solawise:wallet-error",
+        message:
+          error instanceof Error
+            ? `Signed out, but Phantom did not disconnect: ${error.message}`
+            : "Signed out, but Phantom did not disconnect.",
+      });
+    }
+    setPhantomAddress(null);
+    setAuthRoute(null);
+    postToFrame({ type: "solawise:auth-signed-out" });
+    setAuthBusy(false);
+  };
 
   useEffect(() => {
     function onMessage(event: MessageEvent<unknown>) {
@@ -486,12 +802,22 @@ function PollarBridge({
         return;
       }
       const requireLogin = () => {
+        setAuthMessage(null);
+        setAuthRoute("login");
         frameRef.current?.contentWindow?.postMessage(
-          { type: "solawise:pollar-require-login" },
+          { type: "solawise:auth-required" },
           window.location.origin,
         );
       };
 
+      if (message.type === "solawise:app-logout") {
+        void signOutOfSolaWise();
+        return;
+      }
+      if (message.type === "solawise:pollar-link") {
+        requestPollarLink();
+        return;
+      }
       if (message.type === "solawise:phantom-disconnect") {
         void phantomProvider.current?.disconnect().catch((error: unknown) => {
           frameRef.current?.contentWindow?.postMessage(
@@ -545,6 +871,14 @@ function PollarBridge({
           });
           return;
         }
+        if (!supabaseUser) {
+          respond({
+            type: "solawise:program-error",
+            message: "Sign in with your SolaWise account before making a transaction.",
+          });
+          requireLogin();
+          return;
+        }
         const provider = phantomProvider.current;
         const publicKey = provider?.publicKey;
         if (
@@ -556,6 +890,19 @@ function PollarBridge({
           respond({
             type: "solawise:program-error",
             message: "Connect Phantom to sign this Solana devnet transaction.",
+          });
+          return;
+        }
+        if (
+          !linkedAccounts.some(
+            (account) =>
+              account.provider === "phantom" &&
+              account.wallet_address === phantomAddress,
+          )
+        ) {
+          respond({
+            type: "solawise:program-error",
+            message: "Link this Phantom wallet to your SolaWise account before transacting.",
           });
           return;
         }
@@ -581,44 +928,46 @@ function PollarBridge({
           );
         return;
       }
-      if (message.type === "solawise:pollar-verify-email-code") {
-        if (typeof message.code !== "string") return;
-        try {
-          getClient().verifyEmailCode(message.code);
-        } catch (error) {
-          const detail =
-            error instanceof Error ? error.message : "Could not verify the email code.";
-          frameRef.current?.contentWindow?.postMessage(
-            { type: "solawise:pollar-error", message: detail },
-            window.location.origin,
-          );
-        }
-        return;
-      }
       if (message.type === "solawise:pollar-logout") {
-        logout();
+        void signOutOfSolaWise();
         return;
       }
       if (message.type === "solawise:pollar-action") {
-        if (!isAuthenticated || !verified) {
+        if (!supabaseUser) {
           requireLogin();
+          return;
+        }
+        if (message.action === "link") {
+          requestPollarLink();
+          return;
+        }
+        if (message.action === "create-wallet") {
+          if (!isAuthenticated || !verified) {
+            requestPollarLink();
+            return;
+          }
+          void createWallet().catch((error: unknown) => {
+            const detail =
+              error instanceof Error ? error.message : "Could not create the Pollar wallet.";
+            postToFrame({ type: "solawise:pollar-error", message: detail });
+          });
+          return;
+        }
+        const linkedPollarAddress = linkedAccounts.find(
+          (account) => account.provider === "pollar",
+        )?.wallet_address;
+        if (
+          !isAuthenticated ||
+          !verified ||
+          !solanaWallet?.address ||
+          linkedPollarAddress !== solanaWallet.address
+        ) {
+          requestPollarLink();
           return;
         }
 
         try {
           switch (message.action) {
-            case "create-wallet":
-              void createWallet().catch((error: unknown) => {
-                const detail =
-                  error instanceof Error
-                    ? error.message
-                    : "Could not create the Pollar wallet.";
-                frameRef.current?.contentWindow?.postMessage(
-                  { type: "solawise:pollar-error", message: detail },
-                  window.location.origin,
-                );
-              });
-              break;
             case "send":
               openSendModal();
               break;
@@ -661,43 +1010,18 @@ function PollarBridge({
         }
         return;
       }
-      if (message.type !== "solawise:pollar-login") return;
-
-      try {
-        if (
-          message.provider === "email" &&
-          typeof message.email === "string"
-        ) {
-          login({ provider: "email", email: message.email });
-        } else {
-          frameRef.current?.contentWindow?.postMessage(
-            {
-              type: "solawise:pollar-error",
-              message: "Use Pollar email-code sign-in.",
-            },
-            window.location.origin,
-          );
-        }
-      } catch (error) {
-        const detail =
-          error instanceof Error ? error.message : "Pollar sign-in failed.";
-        frameRef.current?.contentWindow?.postMessage(
-          { type: "solawise:pollar-error", message: detail },
-          window.location.origin,
-        );
-      }
+      if (message.type === "solawise:pollar-login") requestPollarLink();
     }
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [
     createWallet,
+    linkedAccounts,
     appConfig,
     configStatus,
     frameRef,
-    getClient,
     isAuthenticated,
-    login,
     logout,
     openReceiveModal,
     openRampModal,
@@ -706,7 +1030,12 @@ function PollarBridge({
     openWalletBalanceModal,
     refreshWalletBalance,
     phantomAddress,
+    requestPollarLink,
+    postToFrame,
     setAuthRoute,
+    signOutOfSolaWise,
+    solanaWallet?.address,
+    supabaseUser,
     verified,
   ]);
 
@@ -719,19 +1048,15 @@ function PollarBridge({
     }
     window.solawiseConnectPhantom();
   };
-  const connectWithPollar = () => {
-    setAuthMessage(null);
-    try {
-      openLoginModal();
-    } catch (error) {
-      setAuthMessage(
-        error instanceof Error ? error.message : "Pollar sign-in could not be opened.",
-      );
-    }
-  };
-
   const walletConnectControl =
-    authRoute === null && isAuthenticated && verified && !phantomAddress ? (
+    authRoute === null &&
+    supabaseUser &&
+    (!phantomAddress ||
+      !linkedAccounts.some(
+        (account) =>
+          account.provider === "phantom" &&
+          account.wallet_address === phantomAddress,
+      )) ? (
       <div
         style={{
           position: "fixed",
@@ -758,7 +1083,7 @@ function PollarBridge({
             cursor: "pointer",
           }}
         >
-          Connect Phantom for savings
+          {phantomAddress ? "Link Phantom to SolaWise" : "Connect Phantom for savings"}
         </button>
         {authMessage && (
           <span
@@ -810,48 +1135,120 @@ function PollarBridge({
             {authRoute === "signup" ? "Create your SolaWise account" : "Welcome back"}
           </h1>
           <p style={{ margin: "0 0 20px", color: "#6b7a95", lineHeight: 1.5 }}>
-            Choose Phantom or Pollar. Approve the request in your wallet or complete Pollar sign-in to continue.
+            {authRoute === "signup"
+              ? "Create an account with email and password or use Phantom. Email signup skips verification codes when Confirm email is disabled in Supabase."
+              : "Sign in with your email and password or use Phantom. Phantom sign-in needs your approval for a message, not an email verification code."}
           </p>
-          <button
-            type="button"
-            onClick={connectWithPhantom}
+          <form onSubmit={submitSupabaseAuth}>
+            <label htmlFor="solawise-auth-email" style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>
+              Email
+            </label>
+            <input
+              id="solawise-auth-email"
+              type="email"
+              autoComplete="email"
+              required
+              value={authEmail}
+              onChange={(event) => setAuthEmail(event.target.value)}
+              style={{ width: "100%", minHeight: 46, padding: "0 12px", border: "1px solid #d5ddec", borderRadius: 8, boxSizing: "border-box" }}
+            />
+            <label htmlFor="solawise-auth-password" style={{ display: "block", margin: "14px 0 6px", fontWeight: 600 }}>
+              Password
+            </label>
+            <input
+              id="solawise-auth-password"
+              type="password"
+              autoComplete={authRoute === "signup" ? "new-password" : "current-password"}
+              minLength={authRoute === "signup" ? 8 : undefined}
+              required
+              value={authPassword}
+              onChange={(event) => setAuthPassword(event.target.value)}
+              style={{ width: "100%", minHeight: 46, padding: "0 12px", border: "1px solid #d5ddec", borderRadius: 8, boxSizing: "border-box" }}
+            />
+            <button
+              type="submit"
+              disabled={!supabaseAuthReady || !supabase || authBusy}
+              style={{
+                width: "100%",
+                minHeight: 48,
+                marginTop: 18,
+                border: 0,
+                borderRadius: 8,
+                background: "#0067F5",
+                color: "#fff",
+                fontSize: 16,
+                fontWeight: 700,
+                cursor: "pointer",
+                opacity: !supabaseAuthReady || !supabase || authBusy ? 0.6 : 1,
+              }}
+            >
+              {authBusy
+                ? "Please wait…"
+                : authRoute === "signup"
+                  ? "Create account"
+                  : "Sign in"}
+            </button>
+          </form>
+          <div
             style={{
-              width: "100%",
-              minHeight: 48,
-              border: 0,
-              borderRadius: 8,
-              background: "#0067F5",
-              color: "#fff",
-              fontSize: 16,
-              fontWeight: 700,
-              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              margin: "16px 0",
+              color: "#8793a8",
+              fontSize: 13,
             }}
           >
-            Continue with Phantom
-          </button>
+            <span style={{ height: 1, flex: 1, background: "#e5eaf2" }} />
+            or
+            <span style={{ height: 1, flex: 1, background: "#e5eaf2" }} />
+          </div>
           <button
             type="button"
-            onClick={connectWithPollar}
+            onClick={() => void signInWithPhantom()}
+            disabled={!supabaseAuthReady || !supabase || authBusy}
             style={{
               width: "100%",
               minHeight: 48,
-              marginTop: 10,
               border: "1px solid #d5ddec",
               borderRadius: 8,
               background: "#fff",
               color: "#0A2E65",
               fontSize: 16,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: "pointer",
+              opacity: !supabaseAuthReady || !supabase || authBusy ? 0.6 : 1,
             }}
           >
-            Continue with Pollar
+            {authBusy ? "Please wait…" : "Continue with Phantom"}
           </button>
-          {authMessage && (
-            <p role="status" style={{ margin: "14px 0 0", color: "#6b7a95", lineHeight: 1.5 }}>
-              {authMessage}
-            </p>
-          )}
+          <p style={{ margin: "14px 0 0", color: "#6b7a95", lineHeight: 1.5 }} role="status">
+            {!supabaseAuthReady
+              ? "Checking Supabase session…"
+              : !supabase
+                ? "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, apply the database migration, and restart the app."
+                : supabaseAuthError || authMessage || ""}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMessage(null);
+              setAuthPassword("");
+              setAuthRoute(authRoute === "signup" ? "login" : "signup");
+            }}
+            style={{ marginTop: 14, padding: 0, border: 0, background: "transparent", color: "#0067F5", fontWeight: 600, cursor: "pointer" }}
+          >
+            {authRoute === "signup"
+              ? "Already have an account? Sign in"
+              : "New to SolaWise? Create an account"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthRoute(null)}
+            style={{ display: "block", margin: "14px auto 0", padding: 0, border: 0, background: "transparent", color: "#6b7a95", cursor: "pointer" }}
+          >
+            Cancel
+          </button>
         </div>
         </div>
       )}
@@ -867,6 +1264,10 @@ function ConfiguredPollarShell({
   initialHash,
   authRoute,
   setAuthRoute,
+  supabase,
+  supabaseUser,
+  supabaseAuthReady,
+  supabaseAuthError,
 }: {
   apiKey: string;
   frameRef: React.RefObject<HTMLIFrameElement | null>;
@@ -875,6 +1276,10 @@ function ConfiguredPollarShell({
   initialHash: string;
   authRoute: AuthRoute;
   setAuthRoute: (route: AuthRoute) => void;
+  supabase: SupabaseBrowserClient | null;
+  supabaseUser: User | null;
+  supabaseAuthReady: boolean;
+  supabaseAuthError: string | null;
 }) {
   const client = getClientConfig(apiKey);
 
@@ -885,6 +1290,10 @@ function ConfiguredPollarShell({
         frameLoaded={frameLoaded}
         authRoute={authRoute}
         setAuthRoute={setAuthRoute}
+        supabase={supabase}
+        supabaseUser={supabaseUser}
+        supabaseAuthReady={supabaseAuthReady}
+        supabaseAuthError={supabaseAuthError}
       />
       <SolawiseFrame
         frameRef={frameRef}
@@ -900,6 +1309,10 @@ export default function PollarShell() {
   const [frameLoaded, setFrameLoaded] = useState(false);
   const [initialHash, setInitialHash] = useState("");
   const [authRoute, setAuthRoute] = useState<AuthRoute>(null);
+  const [supabase, setSupabase] = useState<SupabaseBrowserClient | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
+  const [supabaseAuthReady, setSupabaseAuthReady] = useState(false);
+  const [supabaseAuthError, setSupabaseAuthError] = useState<string | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const apiKey = process.env.NEXT_PUBLIC_POLLAR_PUBLISHABLE_KEY;
 
@@ -908,6 +1321,58 @@ export default function PollarShell() {
     setInitialHash(window.location.hash);
     if (window.location.hash === "#login") setAuthRoute("login");
     else if (window.location.hash === "#signup") setAuthRoute("signup");
+  }, []);
+
+  useEffect(() => {
+    let client: SupabaseBrowserClient | null;
+    try {
+      client = getSupabaseBrowserClient();
+    } catch (error) {
+      setSupabaseAuthError(
+        error instanceof Error ? error.message : "Invalid Supabase configuration.",
+      );
+      setSupabaseAuthReady(true);
+      return;
+    }
+    setSupabase(client);
+    if (!client) {
+      setSupabaseAuthReady(true);
+      return;
+    }
+
+    let active = true;
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, session) => {
+      setSupabaseUser(session?.user ?? null);
+      setSupabaseAuthReady(true);
+      setSupabaseAuthError(null);
+    });
+
+    void client.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          setSupabaseAuthError(error.message);
+          setSupabaseAuthReady(true);
+          return;
+        }
+        setSupabaseUser(data.session?.user ?? null);
+        setSupabaseAuthReady(true);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setSupabaseAuthError(
+          error instanceof Error ? error.message : "Could not restore your Supabase session.",
+        );
+        setSupabaseAuthReady(true);
+      });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (!mounted) return <SolawiseFrame />;
@@ -940,6 +1405,10 @@ export default function PollarShell() {
       onFrameLoad={() => setFrameLoaded(true)}
       authRoute={authRoute}
       setAuthRoute={setAuthRoute}
+      supabase={supabase}
+      supabaseUser={supabaseUser}
+      supabaseAuthReady={supabaseAuthReady}
+      supabaseAuthError={supabaseAuthError}
     />
   );
 }
